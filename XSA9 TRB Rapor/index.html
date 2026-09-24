@@ -7,6 +7,28 @@
     <title>TRB Bridge Günlük Rapor Oluşturucu</title>
     <!-- PDF'e dönüştürmek için html2pdf kütüphanesi -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- 1. Supabase JS SDK Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- 2. Supabase İstemci Tanımı ve Oturum Kontrolü -->
+    <script>
+        const SUPABASE_URL = 'https://nkjhrabhzwjynrhwefzt.supabase.co'; // Supabase Proje URL'iniz
+        const SUPABASE_ANON_KEY = 'sb_publishable_ibwqeAgUBpfOVRwQ7rGAOA_mkqIWbw1'; // Supabase Anon Key'iniz
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                if (error || !session) {
+                    window.location.href = 'https://suatcanyasak.github.io/XSA9-Portal-with-Auth/index.html'; 
+                }
+            } catch (err) {
+                // Herhangi bir bağlantı veya kod hatasında da doğrudan giriş sayfasına yönlendir
+                window.location.href = 'https://suatcanyasak.github.io/XSA9-Portal-with-Auth/index.html';
+            }
+        });
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
