@@ -1,0 +1,1559 @@
+
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XSA9 Auto Workforce Division Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary: #475569;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --excel-section: #deeaf6;
+            --excel-green: #f0fdf4;
+            --table-header: #f1f5f9;
+            --highlight: #fef2f2;
+            --selected-row: #dbeafe;
+            --kpi-bg: #eff6ff;
+            --kpi-border: #bfdbfe;
+            --kpi-text: #1e40af;
+        }
+
+        /* Karanlık Mod Değişkenleri */
+        [data-theme="dark"] {
+            --background: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --excel-section: #1e3a8a;
+            --excel-green: #064e3b;
+            --table-header: #334155;
+            --highlight: #451a03;
+            --selected-row: #1e3a8a;
+            --kpi-bg: #172554;
+            --kpi-border: #1e3a8a;
+            --kpi-text: #93c5fd;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .theme-toggle-btn {
+            background: var(--secondary);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: opacity 0.2s;
+        }
+        .theme-toggle-btn:hover { opacity: 0.9; }
+
+        .container {
+            max-width: 1650px;
+            margin: 0 auto;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+
+        .sidebar {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            height: fit-content;
+            border: 1px solid var(--border);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            background: var(--background);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        .file-upload-box {
+            border: 2px dashed #3b82f6;
+            background-color: rgba(59, 130, 246, 0.05);
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .file-upload-box:hover, .file-upload-box.dragover {
+            background-color: rgba(59, 130, 246, 0.15);
+            border-color: var(--primary);
+        }
+
+        .file-upload-box strong {
+            font-size: 13px;
+            color: #3b82f6;
+            display: block;
+        }
+
+        .cpt-table-container {
+            max-height: 220px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 15px;
+            background: var(--background);
+        }
+        
+        .cpt-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .cpt-row {
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .cpt-row td {
+            padding: 8px 10px;
+            text-align: left;
+            border: none;
+        }
+
+        .cpt-row:hover {
+            background-color: var(--table-header);
+        }
+
+        .cpt-row.selected-cpt {
+            background-color: var(--selected-row) !important;
+            font-weight: bold;
+            border-left: 4px solid var(--primary);
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+        }
+
+        .card-header-toggle {
+            background-color: var(--excel-section);
+            padding: 12px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 16px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+            transition: opacity 0.2s ease;
+        }
+        .card-header-toggle:hover {
+            opacity: 0.9;
+        }
+        .card-header-toggle .toggle-icon {
+            font-size: 12px;
+            transition: transform 0.2s ease;
+        }
+        .card-header-toggle.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .card-content-collapse {
+            max-height: 5000px;
+            overflow: hidden;
+            transition: max-height 0.4s ease-in-out, margin-top 0.3s ease;
+            margin-top: 20px;
+        }
+        .card-content-collapse.collapsed {
+            max-height: 0 !important;
+            margin-top: 0 !important;
+        }
+
+        .kpi-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .kpi-box {
+            background-color: var(--kpi-bg);
+            border: 1px solid var(--kpi-border);
+            color: var(--kpi-text);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .kpi-box strong {
+            font-size: 15px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .backlog-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        .backlog-table th {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            font-weight: bold;
+            padding: 8px 6px;
+            border: 1px solid #d1d5db;
+            text-align: center;
+        }
+        [data-theme="dark"] .backlog-table th {
+            background-color: #374151;
+            color: #f9fafb;
+            border: 1px solid #4b5563;
+        }
+        .backlog-table td {
+            padding: 8px 6px;
+            border: 1px solid #e5e7eb;
+            vertical-align: middle;
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+        [data-theme="dark"] .backlog-table td {
+            border: 1px solid #4b5563;
+            background-color: rgba(30, 41, 59, 0.5);
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-container {
+            background: var(--background);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            height: 260px;
+            position: relative;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 8px;
+        }
+
+        th {
+            background-color: var(--table-header);
+            font-weight: bold;
+            color: var(--text-muted);
+        }
+
+        .clickable-row {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .clickable-row:hover {
+            background-color: var(--table-header);
+        }
+        .clickable-row.selected-filter {
+            background-color: var(--selected-row) !important;
+            font-weight: bold;
+        }
+
+        .section-title-bar {
+            background-color: var(--excel-section);
+            font-weight: bold;
+            text-align: center;
+            font-size: 13px;
+            padding: 6px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        .highlight-cell {
+            background-color: var(--highlight);
+            font-weight: bold;
+        }
+
+        .top-tables-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .zone-block-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .bottom-table-container {
+            margin-top: 15px;
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        .wf-grid-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+
+        .wf-column-box {
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: opacity 0.3s ease;
+        }
+
+        .wf-column-box.dimmed {
+            opacity: 0.15;
+        }
+
+        .wf-column-header {
+            background-color: var(--excel-section);
+            font-weight: bold;
+            font-size: 13px;
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .wf-column-body {
+            padding: 8px;
+            min-height: 140px;
+            font-size: 11px;
+            line-height: 1.6;
+            flex-grow: 1;
+        }
+
+        .wf-column-body div {
+            padding: 6px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+        }
+
+        .wf-total-row {
+            background-color: var(--table-header);
+            font-weight: bold;
+            text-align: center;
+            padding: 8px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        .badge-fixed { background-color: #fee2e2; color: #991b1b; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 10px; float: right; }
+        .badge-flex { background-color: #dcfce7; color: #166534; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 10px; float: right; }
+        .badge-ns { background-color: #fef3c7; color: #92400e; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 10px; float: right; }
+        .badge-gift { background-color: #f3e8ff; color: #6b21a8; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 10px; float: right; }
+        
+        .alert-box {
+            padding: 12px;
+            background-color: #fffbeb;
+            border: 1px solid #fef3c7;
+            color: #92400e;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 15px;
+            display: none;
+            font-weight: 500;
+        }
+
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            transition: opacity 0.2s, background-color 0.2s;
+        }
+        .sortable-header:hover {
+            opacity: 0.8;
+            filter: brightness(0.95);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-bar">
+        <h2 style="margin: 0; font-size: 20px; letter-spacing: 0.5px;">🟢 XSA9 Workforce Division Dashboard</h2>
+        <button class="theme-toggle-btn" id="themeToggle">🌓 Mod Değiştir</button>
+    </div>
+
+    <div class="dashboard-grid">
+        
+        <aside class="sidebar">
+            <h3 style="margin-top:0; font-size:15px; border-bottom:1px solid var(--border); padding-bottom:8px;">📊 VERİ YÜKLEME</h3>
+            
+            <div class="file-upload-box" id="dropZone" onclick="document.getElementById('csvFile').click()">
+                <strong id="uploadLabel">📁 Excel/CSV Seçin veya Sürükleyin</strong>
+                <input type="file" id="csvFile" accept=".csv" style="display:none">
+            </div>
+
+            <h3 style="font-size:14px; border-bottom:1px solid var(--border); padding-bottom:4px; margin-top:20px; color:var(--primary);">🕒 CPT SEÇİMİ</h3>
+           
+            <div class="cpt-table-container">
+                <table class="cpt-table">
+                    <tbody id="cptTableBody">
+                        <tr><td style="text-align: center; color: var(--text-muted);">Henüz veri yüklenmedi</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <small style="display:block; font-size:10px; color:var(--text-muted); margin-top:-10px; margin-bottom:15px; text-align:center;">Birden fazla seçim yapabilirsiniz. Hiçbir şey seçmezseniz tüm liste dâhil edilir.</small>
+
+            <div class="input-group" style="background-color: rgba(59, 130, 246, 0.08); padding: 10px; border-radius: 6px; border: 1px solid #bfdbfe; margin-top: 15px;">
+                <label style="color: var(--primary); font-weight: bold; margin-bottom: 4px;">⏱️ Hesaplama Başlangıç Zamanı</label>
+                <input type="datetime-local" id="calculationStartTime">
+            </div>
+            
+            <h3 style="font-size:14px; border-bottom:1px solid var(--border); padding-bottom:4px; margin-top:20px;">⚙️ HIZ & KAPASİTE</h3>
+            <div class="input-group">
+                <label>Single PPH</label>
+                <input type="number" id="pphSingle" value="45">
+            </div>
+            <div class="input-group">
+                <label>Multi PPH</label>
+                <input type="number" id="pphMulti" value="80">
+            </div>
+            <div class="input-group">
+                <label>Nonsort PPH</label>
+                <input type="number" id="pphNonsort" value="30">
+            </div>
+          
+            <div class="input-group">
+                <label>Personel Sayısı (Kapasite)</label>
+                <input type="number" id="mevcutPersonel" value="35">
+            </div>
+            <button id="processBtn" style="width:100%; padding:10px; background:var(--primary); color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:13px; transition: background 0.2s;">Hesapla / Güncelle</button>
+        </aside>
+
+        <main class="main-content">
+            <div class="kpi-container" id="kpiPanel" style="display:none;">
+                <div class="kpi-box" id="kpiEtaBox"></div>
+                <div class="kpi-box" id="kpiBacklogBox" style="background-color: #fff1f2; border-color: #fecdd3; color: #9f1239;"></div>
+            </div>
+
+            <div id="alertContainer" class="alert-box"></div>
+            
+            <div class="card">
+                <div class="card-header-toggle" onclick="toggleCard('totalDbContent', this)">
+                    <span>TOTAL DB (GENEL ANALİZ)</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+
+                <div class="card-content-collapse" id="totalDbContent">
+                    <small style="display:block; font-size:11px; font-weight:normal; margin-bottom:15px; text-align: center;">💡 Filtrelemek için aşağıdaki Process Path satırlarına tıklayabilirsiniz.</small>
+                    <div class="charts-grid">
+                        <div class="chart-container">
+                            <canvas id="ppChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="zoneChart"></canvas>
+                        </div>
+                    </div>
+                   
+                    <div class="top-tables-container">
+                        <div>
+                            <div class="section-title-bar">PROCESS PATH KIRILIM</div>
+                            <table style="margin-top:8px;">
+                                <thead>
+                                    <tr><th>Process Path</th><th style="width:90px;">Units</th></tr>
+                                </thead>
+                                <tbody id="ppTableBody">
+                                    <tr class="clickable-row" data-path="SINGLE"><td>SINGLE</td><td class="highlight-cell">0</td></tr>
+                                    <tr class="clickable-row" data-path="MULTI"><td>MULTI</td><td class="highlight-cell">0</td></tr>
+                                    <tr class="clickable-row" data-path="NONSORT"><td>NONSORT</td><td class="highlight-cell">0</td></tr>
+                                    <tr class="clickable-row" data-path="GIFT SINGLE"><td>GIFT SINGLE</td><td class="highlight-cell">0</td></tr>
+                                    <tr class="clickable-row" data-path="GIFT MULTI"><td>GIFT MULTI</td><td class="highlight-cell">0</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div>
+                            <div class="section-title-bar">ZONE KIRILIM</div>
+                            <div class="zone-block-wrapper" id="zoneTablesWrapper" style="margin-top:8px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="bottom-table-container">
+                        <div class="section-title-bar">KAT KIRILIM</div>
+                        <table class="floor-table" id="floorTable" style="margin-top:8px;"></table>
+                    </div>
+
+                    <!-- MULTI BATCH TABLOSU -->
+                    <div class="bottom-table-container">
+                        <div class="section-title-bar">MULTI BATCH & ZONE KIRILIM</div>
+                        <table class="floor-table" id="multiBatchTable" style="margin-top:8px;"></table>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="card" style="background-color: var(--excel-green);">
+                <div class="card-header-toggle" onclick="toggleCard('wfZoneContent', this)">
+                    <span>WORKFORCE (BÖLGE DAĞILIMI)</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                
+                <div class="card-content-collapse" id="wfZoneContent">
+                    <div class="wf-grid-container" id="wfZoneGrid"></div>
+                </div>
+            </div>
+
+            <div class="card" style="background-color: var(--excel-green);">
+                <div class="card-header-toggle" onclick="toggleCard('wfFloorContent', this)">
+                    <span>WORKFORCE KAT (KAT BAZLI DİNAMİK DAĞITIM)</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+
+                <div class="card-content-collapse" id="wfFloorContent">
+                    <div class="wf-grid-container" id="wfFloorGrid"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+    let rawData = [];
+    let uniqueCPTs = [];
+    let selectedCPTs = new Set();
+    
+    let ppChartInstance = null;
+    let zoneChartInstance = null;
+    let selectedProcessPathFilter = null;
+    
+    // Sıralama Değişkenleri
+    let multiBatchSortCol = 'default'; // 'default', 'cpt', 'total', 'dwell'
+    let multiBatchSortDir = 'desc';    // 'desc', 'asc'
+    
+    const PATH_GROUPS = ["SINGLE", "MULTI", "NONSORT", "GIFT SINGLE", "GIFT MULTI"];
+    const ZONE_HEADERS = ["A-HRV", "A", "B", "C", "D", "M", "E"];
+    const FLOOR_HEADERS = [
+        "A-HRV", "1-A", "2-A", "3-A", "4-A", "1-B", "2-B", "3-B", "4-B", 
+        "1-C", "2-C", "3-C", "4-C", "1-D", "1-M", "1-E"
+    ];
+    
+    // VERİ SÜTUN İNDEKSLERİ 
+    const COL_CPT = 3;
+    const COL_ZONE = 4;   
+    const COL_PP = 9;      
+    const COL_BATCH = 11;
+    const COL_QTY = 12;   
+    const COL_DWELL = 14; 
+
+    function setCurrentTimeToInput() {
+        const now = new Date();
+        let offset = now.getTimezoneOffset();
+        let localNow = new Date(now.getTime() - (offset * 60 * 1000));
+        document.getElementById('calculationStartTime').value = localNow.toISOString().slice(0, 16);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        setCurrentTimeToInput();
+    });
+
+    function toggleCard(contentId, headerEl) {
+        const content = document.getElementById(contentId);
+        content.classList.toggle('collapsed');
+        headerEl.classList.toggle('collapsed');
+    }
+
+    function toggleMultiBatchSort(columnName) {
+        if (multiBatchSortCol === columnName) {
+            if (multiBatchSortDir === 'desc') {
+                multiBatchSortDir = 'asc';
+            } else if (multiBatchSortDir === 'asc') {
+                multiBatchSortCol = 'default';
+                multiBatchSortDir = 'desc';
+            }
+        } else {
+            multiBatchSortCol = columnName;
+            multiBatchSortDir = 'desc';
+        }
+        
+        if (rawData.length > 0) processData(rawData);
+    }
+
+    function formatHoursToReadable(hoursValue) {
+        if (!hoursValue || hoursValue <= 0 || isNaN(hoursValue)) return "0 saat 0 dakika";
+        let totalMinutes = Math.round(hoursValue * 60);
+        let hrs = Math.floor(totalMinutes / 60);
+        let mins = totalMinutes % 60;
+        return `${hrs} saat ${mins} dakika`;
+    }
+
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if(e.dataTransfer.files.length) {
+            document.getElementById('csvFile').files = e.dataTransfer.files;
+            handleFile({ target: { files: e.dataTransfer.files } });
+        }
+    });
+
+    const themeToggle = document.getElementById('themeToggle');
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const targetTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', targetTheme);
+        if(rawData.length > 0) processData(rawData); 
+    });
+
+    document.querySelectorAll('.clickable-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const clickedPath = this.getAttribute('data-path');
+            if (selectedProcessPathFilter === clickedPath) {
+                selectedProcessPathFilter = null;
+                this.classList.remove('selected-filter');
+            } else {
+                document.querySelectorAll('.clickable-row').forEach(r => r.classList.remove('selected-filter'));
+                selectedProcessPathFilter = clickedPath;
+                this.classList.add('selected-filter');
+            }
+            processData(rawData);
+        });
+    });
+
+    document.getElementById('csvFile').addEventListener('change', handleFile);
+    
+    document.getElementById('processBtn').addEventListener('click', () => {
+        setCurrentTimeToInput(); 
+        processData(rawData);
+    });
+
+    function handleFile(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        document.getElementById('uploadLabel').innerText = "📁 " + file.name;
+        const reader = new FileReader();
+        reader.onload = function(evt) { parseCSV(evt.target.result); };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    function parseCSV(text) {
+        const lines = text.split(/\r?\n/);
+        rawData = [];
+        let cptSet = new Set();
+
+        for(let i = 1; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if(!line) continue;
+            
+            let row = [];
+            let inQuotes = false;
+            let currentCell = "";
+            for (let j = 0; j < line.length; j++) {
+                let char = line[j];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    row.push(currentCell.trim());
+                    currentCell = "";
+                } else {
+                    currentCell += char;
+                }
+            }
+            row.push(currentCell.trim());
+            
+            let cleanRow = row.map(cell => {
+                if (cell.startsWith('"') && cell.endsWith('"')) {
+                    cell = cell.substring(1, cell.length - 1);
+                }
+                return cell.replace(/""/g, '"').trim();
+            });
+            rawData.push(cleanRow);
+
+            if (cleanRow[COL_CPT]) {
+                let timeParsed = Date.parse(cleanRow[COL_CPT].replace(/"/g, ''));
+                if(!isNaN(timeParsed)){
+                    cptSet.add(timeParsed);
+                 }
+            }
+        }
+
+        uniqueCPTs = Array.from(cptSet).sort((a, b) => a - b);
+        selectedCPTs.clear();
+        renderCPTTable();
+
+        setCurrentTimeToInput();
+        selectedProcessPathFilter = null;
+        document.querySelectorAll('.clickable-row').forEach(r => r.classList.remove('selected-filter'));
+        processData(rawData);
+    }
+    
+    function renderCPTTable() {
+        const tbody = document.getElementById('cptTableBody');
+        if (uniqueCPTs.length === 0) {
+            tbody.innerHTML = '<tr><td style="text-align: center; color: var(--text-muted);">CPT bulunamadı</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        uniqueCPTs.forEach(cptTime => {
+            let d = new Date(cptTime);
+            let formatted = d.toLocaleString('tr-TR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+            
+            let tr = document.createElement('tr');
+            tr.className = 'cpt-row';
+            tr.dataset.cpt = cptTime;
+            
+            let td = document.createElement('td');
+            td.innerText = formatted;
+            
+            tr.appendChild(td);
+            
+            tr.addEventListener('click', function() {
+                let cTime = parseInt(this.dataset.cpt);
+                if (selectedCPTs.has(cTime)) {
+                    selectedCPTs.delete(cTime);
+                    this.classList.remove('selected-cpt');
+                } else {
+                    selectedCPTs.add(cTime);
+                    this.classList.add('selected-cpt');
+                }
+                processData(rawData);
+            });
+            
+            tbody.appendChild(tr);
+        });
+    }
+
+    function getGroupKey(ppStr) {
+        let clean = ppStr.trim().toUpperCase();
+        if(clean.includes("GIFTSINGLE") || (clean.includes("GIFT") && clean.includes("SINGLE"))) return "GIFT SINGLE";
+        if(clean.includes("GIFTMULTI") || (clean.includes("GIFT") && clean.includes("MULTI"))) return "GIFT MULTI";
+        if(clean.includes("MULTINONSORT") || clean === "PPMULTINONSORT" || clean.includes("NONSORT")) return "NONSORT";
+        if(clean.includes("MULTISMALL") || clean.includes("MULTIMEDIUM") || clean === "PPMULTISMALLMPPB" || clean.endsWith("MULTI")) return "MULTI";
+        if(clean.includes("SINGLE") || clean === "PPSINGLES") return "SINGLE";
+        return "SINGLE"; 
+    }
+
+    function extractLocationDetails(locStr) {
+        let clean = locStr.toUpperCase().trim();
+        let parts = clean.split('-');
+        if(parts.length >= 3) {
+            let floorNum = parts[1].trim();
+            let remaining = parts[2].trim();      
+            let zoneLetter = remaining.charAt(0);
+            
+            if (floorNum === "1" && zoneLetter === "A") {
+                let rackNum = parseInt(remaining.substring(1, 4));
+                if (!isNaN(rackNum) && rackNum >= 215) {
+                    return { zone: "A-HRV", floor: "A-HRV" };
+                }
+            }
+
+            let zone = "A";
+            if(ZONE_HEADERS.includes(zoneLetter)) {
+                zone = zoneLetter;
+            }
+            let combinedFloor = floorNum + "-" + zone;
+            let floor = FLOOR_HEADERS.includes(combinedFloor) ? combinedFloor : "1-A";
+            return { zone, floor };
+        }
+        return { zone: "A", floor: "1-A" };
+    }
+
+    function calculateRawDemand(pKey, pphVal) {
+        let uA_Hrv = zoneMatrix[pKey]["A-HRV"];
+        let uA = zoneMatrix[pKey]["A"];
+        let uB = zoneMatrix[pKey]["B"];
+        let uC = zoneMatrix[pKey]["C"];
+        let uD = zoneMatrix[pKey]["D"];
+        let uM = zoneMatrix[pKey]["M"];
+        let uE = zoneMatrix[pKey]["E"];
+        let demand = 0;
+        demand += Math.ceil(uM / pphVal);
+        demand += Math.ceil(uE / (pphVal * 2));
+        demand += Math.ceil(uD / (pphVal / 2));
+        let totalFlexibleUnits = uA_Hrv + uA + uB + uC;
+        demand += Math.ceil(totalFlexibleUnits / pphVal);
+        return demand;
+    }
+
+    function generateAssignmentsTemplate(pKey, pphVal, katsayi) {
+        let uAHrv = zoneMatrix[pKey]["A-HRV"];
+        let uA = zoneMatrix[pKey]["A"];
+        let uB = zoneMatrix[pKey]["B"];
+        let uC = zoneMatrix[pKey]["C"];
+        let uD = zoneMatrix[pKey]["D"];
+        let uM = zoneMatrix[pKey]["M"];
+        let uE = zoneMatrix[pKey]["E"];
+        let assignments = [];
+
+        if (uM > 0) {
+            let rawM = Math.ceil(uM / pphVal);
+            let finalM = Math.round(rawM * katsayi) || (katsayi > 0 ? 1 : 0);
+            for(let i=0; i<finalM; i++) {
+                assignments.push({ isFixedZone: true, baseZonesOrdered: [["M"]], baseLabel: "M" });
+            }
+        }
+
+        if (uE > 0) {
+            let pphE = pphVal * 2; 
+            let rawE = Math.ceil(uE / pphE);
+            let finalE = Math.round(rawE * katsayi) || (katsayi > 0 ? 1 : 0);
+            for(let i=0; i<finalE; i++) {
+                assignments.push({ isFixedZone: true, baseZonesOrdered: [["E"]], baseLabel: "E" });
+            }
+        }
+
+        if (uD > 0) {
+            let pphD = pphVal / 2;
+            let rawD = Math.ceil(uD / pphD);
+            let finalD = Math.round(rawD * katsayi) || (katsayi > 0 ? 1 : 0);
+            for(let i=0; i<finalD; i++) {
+                assignments.push({ isFixedZone: true, baseZonesOrdered: [["D"]], baseLabel: "D" });
+            }
+        }
+
+        let totalFlexUnits = uAHrv + uA + uB + uC;
+        if (totalFlexUnits > 0) {
+            let rawFlexCount = Math.ceil(totalFlexUnits / pphVal);
+            let finalFlexCount = Math.round(rawFlexCount * katsayi);
+            if (finalFlexCount === 0 && katsayi > 0) finalFlexCount = 1;
+            for (let i = 0; i < finalFlexCount; i++) {
+                let zonesWithQty = [
+                    { name: "A-HRV", qty: uAHrv, subZones: ["A-HRV"] },
+                    { name: "A", qty: uA, subZones: ["A"] },
+                    { name: "B", qty: uB, subZones: ["B"] },
+                    { name: "C", qty: uC, subZones: ["C"] }
+                ].filter(z => z.qty > 0);
+                if (zonesWithQty.length === 0) break;
+                
+                zonesWithQty.sort((x, y) => y.qty - x.qty);
+
+                let baseZonesOrdered = [];
+                let labelParts = [];
+                let maxPairs = Math.min(2, zonesWithQty.length);
+                for(let j = 0; j < maxPairs; j++) {
+                    baseZonesOrdered.push(zonesWithQty[j].subZones);
+                    labelParts.push(zonesWithQty[j].name);
+                }
+
+                assignments.push({
+                    isFixedZone: labelParts.length === 1,
+                    baseZonesOrdered: baseZonesOrdered,
+                    baseLabel: labelParts.sort().join(" - ")
+                });
+
+                let share = pphVal / labelParts.length;
+                if (labelParts.includes("A-HRV")) uAHrv = Math.max(0, uAHrv - share);
+                if (labelParts.includes("A")) uA = Math.max(0, uA - share);
+                if (labelParts.includes("B")) uB = Math.max(0, uB - share);
+                if (labelParts.includes("C")) uC = Math.max(0, uC - share);
+            }
+        }
+        return assignments;
+    }
+
+    function updateCharts(ppTotals, zoneTotals) {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const textColor = isDark ? '#f8fafc' : '#0f172a';
+        const gridColor = isDark ? '#334155' : '#e2e8f0';
+        let chartPPTotals = { ...ppTotals };
+        let chartZoneTotals = { ...zoneTotals };
+        if (selectedProcessPathFilter) {
+            PATH_GROUPS.forEach(p => { if(p !== selectedProcessPathFilter) chartPPTotals[p] = 0; });
+        }
+
+        if(ppChartInstance) ppChartInstance.destroy();
+        const ctxPP = document.getElementById('ppChart').getContext('2d');
+        ppChartInstance = new Chart(ctxPP, {
+            type: 'pie',
+            data: {
+                labels: Object.keys(chartPPTotals),
+                datasets: [{
+                    data: Object.values(chartPPTotals),
+                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: textColor } },
+                    title: { display: true, text: 'Process Path Dağılımı', color: textColor, font: { size: 14, weight: 'bold' } }
+                }
+            }
+        });
+
+        if(zoneChartInstance) zoneChartInstance.destroy();
+        const ctxZone = document.getElementById('zoneChart').getContext('2d');
+        zoneChartInstance = new Chart(ctxZone, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(chartZoneTotals),
+                datasets: [{
+                    label: 'Toplam İş Adeti',
+                    data: Object.values(chartZoneTotals),
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: 'Bölge Bazlı İş Yükü (Zone)', color: textColor, font: { size: 14, weight: 'bold' } }
+                },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                    y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                }
+            }
+        });
+    }
+
+    let zoneMatrix = {}; 
+    let floorMatrix = {};
+    
+    function processData(data) {
+        if(data.length === 0) return;
+
+        const pphS = parseFloat(document.getElementById('pphSingle').value) || 1;
+        const pphM = parseFloat(document.getElementById('pphMulti').value) || 1;
+        const pphN = parseFloat(document.getElementById('pphNonsort').value) || 1;
+        const mevcutPersonel = parseFloat(document.getElementById('mevcutPersonel').value) || 0;
+
+        let ppTotals = { "SINGLE": 0, "MULTI": 0, "NONSORT": 0, "GIFT SINGLE": 0, "GIFT MULTI": 0 };
+        let globalZoneTotals = { "A-HRV": 0, "A": 0, "B": 0, "C": 0, "D": 0, "M": 0, "E": 0 };
+        let totalUnitsInSelectedRange = 0;
+        let cptData = {};
+
+        zoneMatrix = {};
+        floorMatrix = {};
+        PATH_GROUPS.forEach(p => {
+            zoneMatrix[p] = {}; ZONE_HEADERS.forEach(z => zoneMatrix[p][z] = 0);
+            floorMatrix[p] = {}; FLOOR_HEADERS.forEach(f => floorMatrix[p][f] = 0);
+        });
+        
+        let nonsortBatches = {};
+        let multiBatches = {};
+        let multiBatchesDwell = {}; 
+        let multiBatchesCpt = {}; // Her batch için en erken CPT'yi saklamak için yeni obje
+
+        data.forEach(row => {
+            if(row.length <= Math.max(COL_ZONE, COL_PP, COL_QTY, COL_CPT)) return;
+            
+            let rawPP = row[COL_PP] || "";
+            let rawLoc = row[COL_ZONE] || "";
+            let qty = parseFloat(row[COL_QTY]) || 0;
+            let batchID = (row[COL_BATCH] || "").trim();
+            let rawCPT = row[COL_CPT] || "";
+            let dwellVal = parseFloat(row[COL_DWELL]) || 0; 
+            
+            if(!rawPP || !rawLoc) return;
+
+            let rowCptTime = Date.parse(rawCPT.replace(/"/g, ''));
+            if (!isNaN(rowCptTime)) {
+                if (selectedCPTs.size > 0 && !selectedCPTs.has(rowCptTime)) {
+                    return; 
+                }
+                
+                if (!cptData[rowCptTime]) {
+                    cptData[rowCptTime] = {};
+                    PATH_GROUPS.forEach(p => {
+                        cptData[rowCptTime][p] = { total: 0, D: 0, E: 0 };
+                    });
+                }
+            } else {
+                 if (selectedCPTs.size > 0) return; 
+            }
+
+            let group = getGroupKey(rawPP);
+            let locInfo = extractLocationDetails(rawLoc);
+
+            totalUnitsInSelectedRange += qty;
+            ppTotals[group] += qty;
+
+            if (!isNaN(rowCptTime) && cptData[rowCptTime] && cptData[rowCptTime][group]) {
+                 cptData[rowCptTime][group].total += qty;
+                 if (locInfo.zone === "D") {
+                     cptData[rowCptTime][group].D += qty;
+                 } else if (locInfo.zone === "E") {
+                     cptData[rowCptTime][group].E += qty;
+                 }
+            }
+
+            zoneMatrix[group][locInfo.zone] += qty;
+            floorMatrix[group][locInfo.floor] += qty;
+
+            if (selectedProcessPathFilter && group !== selectedProcessPathFilter) {
+                return;
+            }
+
+            globalZoneTotals[locInfo.zone] += qty;
+            
+            if(group === "NONSORT" && batchID) {
+                if(!nonsortBatches[batchID]) {
+                    nonsortBatches[batchID] = { zones: new Set(), floors: new Set(), qty: 0 };
+                }
+                nonsortBatches[batchID].zones.add(locInfo.zone);
+                nonsortBatches[batchID].floors.add(locInfo.floor);
+                nonsortBatches[batchID].qty += qty;
+            }
+
+            if(group === "MULTI" && batchID) {
+                if(!multiBatches[batchID]) {
+                    multiBatches[batchID] = {};
+                    ZONE_HEADERS.forEach(z => multiBatches[batchID][z] = 0);
+                    multiBatchesDwell[batchID] = 0;
+                    multiBatchesCpt[batchID] = Infinity; // Başlangıçta sonsuz yapıyoruz ki min. değeri bulalım
+                }
+                multiBatches[batchID][locInfo.zone] += qty;
+                
+                if (dwellVal > multiBatchesDwell[batchID]) {
+                    multiBatchesDwell[batchID] = dwellVal;
+                }
+                
+                // En erken CPT tespiti
+                if (!isNaN(rowCptTime) && rowCptTime < multiBatchesCpt[batchID]) {
+                    multiBatchesCpt[batchID] = rowCptTime;
+                }
+            }
+        });
+
+        updateCharts(ppTotals, globalZoneTotals);
+        PATH_GROUPS.forEach(p => {
+            const rowEl = document.querySelector(`.clickable-row[data-path="${p}"]`);
+            if(rowEl) {
+                rowEl.querySelector('.highlight-cell').innerText = ppTotals[p].toLocaleString();
+            }
+        });
+
+        let zoneHTML = "";
+        PATH_GROUPS.forEach(p => {
+            let isDimmed = selectedProcessPathFilter && selectedProcessPathFilter !== p;
+            zoneHTML += `
+                <table class="zone-mini-table" style="opacity: ${isDimmed ? '0.2' : '1'}">
+                    <thead>
+                        <tr style="background:var(--excel-section);"><th colspan="7" style="font-size:11px; text-align:left; padding-left:5px;">${p}</th></tr>
+                        <tr> ${ZONE_HEADERS.map(z => `<th style="width:14.2%; font-size:10px;">${z}</th>`).join('')} </tr>
+                    </thead>
+                    <tbody>
+                        <tr> ${ZONE_HEADERS.map(z => { let val = zoneMatrix[p][z]; return `<td style="${val > 0 ? 'background:var(--highlight); font-weight:bold;' : ''}">${val}</td>`; }).join('')} </tr>
+                    </tbody>
+                </table>`;
+        });
+        document.getElementById('zoneTablesWrapper').innerHTML = zoneHTML;
+
+        let floorHTML = `<thead><tr><th style="text-align:left; width:120px;">Process Path \\ Kat</th>${FLOOR_HEADERS.map(f => `<th style="font-size:10px;">${f}</th>`).join('')}</tr></thead><tbody>`;
+        PATH_GROUPS.forEach(p => {
+            let isDimmed = selectedProcessPathFilter && selectedProcessPathFilter !== p;
+            floorHTML += `<tr style="opacity: ${isDimmed ? '0.2' : '1'}"><td style="font-weight:bold; text-align:left; background:var(--table-header);">${p}</td>${FLOOR_HEADERS.map(f => { let val = floorMatrix[p][f]; return `<td style="${val > 0 ? 'background:rgba(16, 185, 129, 0.15); font-weight:bold;' : ''}">${val}</td>`; }).join('')}</tr>`;
+        });
+        floorHTML += "</tbody>";
+        document.getElementById('floorTable').innerHTML = floorHTML;
+
+        // MULTI BATCH TABLOSU İKONLARI
+        let sortIconCpt = multiBatchSortCol === 'cpt' ? (multiBatchSortDir === 'desc' ? ' ▼' : ' ▲') : ' ↕';
+        let sortIconTotal = multiBatchSortCol === 'total' ? (multiBatchSortDir === 'desc' ? ' ▼' : ' ▲') : ' ↕';
+        let sortIconDwell = multiBatchSortCol === 'dwell' ? (multiBatchSortDir === 'desc' ? ' ▼' : ' ▲') : ' ↕';
+
+        let multiBatchHTML = `
+            <thead>
+                <tr>
+                    <th style="text-align:left; width:120px;">Batch ID</th>
+                    <th class="sortable-header" style="font-size:10px; background:#eff6ff; color:#1e40af;" onclick="toggleMultiBatchSort('cpt')" title="Sıralamak için tıklayın">CPT${sortIconCpt}</th>
+                    ${ZONE_HEADERS.map(z => `<th style="font-size:10px;">${z}</th>`).join('')}
+                    <th class="sortable-header" style="font-size:10px; background:var(--highlight);" onclick="toggleMultiBatchSort('total')" title="Sıralamak için tıklayın">TOPLAM${sortIconTotal}</th>
+                    <th class="sortable-header" style="font-size:10px; background:#fef3c7; color:#92400e;" onclick="toggleMultiBatchSort('dwell')" title="Sıralamak için tıklayın">Max Dwell${sortIconDwell}</th>
+                </tr>
+            </thead>
+            <tbody>`;
+            
+        let isMultiDimmed = selectedProcessPathFilter && selectedProcessPathFilter !== "MULTI";
+        let multiBatchKeys = Object.keys(multiBatches);
+        
+        if (multiBatchKeys.length === 0) {
+            multiBatchHTML += `<tr><td colspan="${ZONE_HEADERS.length + 4}" style="text-align:center; color:var(--text-muted); padding: 15px;">Filtrelenen aralıkta Multi Batch verisi bulunamadı.</td></tr>`;
+        } else {
+            // Sıralama için veriyi hazırlama
+            let multiBatchData = multiBatchKeys.map(bId => {
+                let rowTotal = 0;
+                ZONE_HEADERS.forEach(z => rowTotal += multiBatches[bId][z]);
+                let maxDwell = multiBatchesDwell[bId];
+                let earliestCpt = multiBatchesCpt[bId];
+                return { bId, rowTotal, maxDwell, earliestCpt };
+            });
+
+            // Sistemdeki en erken CPT'yi bul (vurgu yapmak için)
+            let validCpts = multiBatchData.map(d => d.earliestCpt).filter(c => c !== Infinity);
+            let absoluteEarliestCpt = validCpts.length > 0 ? Math.min(...validCpts) : null;
+
+            // Seçili Sütuna ve Yöne Göre Sıralama
+            if (multiBatchSortCol === 'total') {
+                multiBatchData.sort((a, b) => multiBatchSortDir === 'desc' ? b.rowTotal - a.rowTotal : a.rowTotal - b.rowTotal);
+            } else if (multiBatchSortCol === 'dwell') {
+                multiBatchData.sort((a, b) => multiBatchSortDir === 'desc' ? b.maxDwell - a.maxDwell : a.maxDwell - b.maxDwell);
+            } else if (multiBatchSortCol === 'cpt') {
+                multiBatchData.sort((a, b) => multiBatchSortDir === 'desc' ? b.earliestCpt - a.earliestCpt : a.earliestCpt - b.earliestCpt);
+            } else {
+                multiBatchData.sort((a, b) => a.bId.localeCompare(b.bId));
+            }
+
+            multiBatchData.forEach(item => {
+                let bId = item.bId;
+                let rowTotal = item.rowTotal;
+                let maxDwell = item.maxDwell;
+                let earliestCpt = item.earliestCpt;
+                
+                let cptDisplay = "-";
+                let isEarliest = false;
+                
+                if (earliestCpt !== Infinity) {
+                    let d = new Date(earliestCpt);
+                    cptDisplay = d.toLocaleString('tr-TR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+                    if (earliestCpt === absoluteEarliestCpt) {
+                        isEarliest = true;
+                    }
+                }
+                
+                // En erken CPT ise kırmızı arka plan ver
+                let cptStyle = isEarliest 
+                    ? 'background-color:#fee2e2; color:#991b1b; font-weight:bold; font-size:11px;' 
+                    : 'background-color:var(--background); font-size:11px;';
+                
+                let rowCells = ZONE_HEADERS.map(z => {
+                    let val = multiBatches[bId][z];
+                    return `<td style="${val > 0 ? 'background:rgba(59, 130, 246, 0.15); font-weight:bold;' : ''}">${val}</td>`;
+                }).join('');
+                
+                multiBatchHTML += `<tr style="opacity: ${isMultiDimmed ? '0.2' : '1'}">
+                    <td style="font-weight:bold; text-align:left; background:var(--table-header);">${bId}</td>
+                    <td style="${cptStyle}">${cptDisplay}</td>
+                    ${rowCells}
+                    <td style="background:var(--highlight); font-weight:bold;">${rowTotal}</td>
+                    <td style="background:#fffbeb; color:#92400e; font-weight:bold;">${maxDwell > 0 ? maxDwell : '-'}</td>
+                </tr>`;
+            });
+        }
+        multiBatchHTML += "</tbody>";
+        document.getElementById('multiBatchTable').innerHTML = multiBatchHTML;
+
+        const singleDemandRaw = calculateRawDemand("SINGLE", pphS);
+        const multiDemandRaw = calculateRawDemand("MULTI", pphM);
+        const nonsortDemandRaw = Object.keys(nonsortBatches).length;
+        const anaIhtiyacToplam = singleDemandRaw + multiDemandRaw;
+        const toplamGereksinim = anaIhtiyacToplam + nonsortDemandRaw;
+
+        let katsayiAna = 1;
+        const alertContainer = document.getElementById('alertContainer');
+        if (toplamGereksinim > mevcutPersonel && mevcutPersonel > 0) {
+            const kalanKapasite = mevcutPersonel - nonsortDemandRaw;
+            if (kalanKapasite <= 0) {
+                katsayiAna = 0;
+                alertContainer.innerHTML = `⚠️ <strong>Kritik Durum:</strong> Kapasite yetersiz!`;
+            } else {
+                katsayiAna = kalanKapasite / anaIhtiyacToplam;
+                alertContainer.innerHTML = `⚠️ <strong>Kapasite Sınırlandı:</strong> Ana süreçler <strong>${katsayiAna.toFixed(4)}</strong> çarpanıyla optimize edildi.`;
+            }
+            alertContainer.style.display = "block";
+        } else {
+            alertContainer.style.display = "none";
+        }
+
+        let singleTemplates = generateAssignmentsTemplate("SINGLE", pphS, katsayiAna);
+        let multiTemplates = generateAssignmentsTemplate("MULTI", pphM, katsayiAna);
+
+        document.getElementById('kpiPanel').style.display = "grid";
+        let totalWorkHours = 0;
+
+        const singleD = zoneMatrix["SINGLE"]["D"];
+        const singleE = zoneMatrix["SINGLE"]["E"];
+        const singleNormal = Math.max(0, ppTotals["SINGLE"] - singleD - singleE);
+        totalWorkHours += (singleNormal / pphS) + (singleD / (pphS / 2)) + (singleE / (pphS * 2));
+
+        const multiD = zoneMatrix["MULTI"]["D"];
+        const multiE = zoneMatrix["MULTI"]["E"];
+        const multiNormal = Math.max(0, ppTotals["MULTI"] - multiD - multiE);
+        totalWorkHours += (multiNormal / pphM) + (multiD / (pphM / 2)) + (multiE / (pphM * 2));
+
+        const giftSingleDForEta = zoneMatrix["GIFT SINGLE"]["D"];
+        const giftSingleEForEta = zoneMatrix["GIFT SINGLE"]["E"];
+        const giftSingleNormalForEta = Math.max(0, ppTotals["GIFT SINGLE"] - giftSingleDForEta - giftSingleEForEta);
+        totalWorkHours += (giftSingleNormalForEta / pphS) + (giftSingleDForEta / (pphS / 2)) + (giftSingleEForEta / (pphS * 2));
+
+        const giftMultiDForEta = zoneMatrix["GIFT MULTI"]["D"];
+        const giftMultiEForEta = zoneMatrix["GIFT MULTI"]["E"];
+        const giftMultiNormalForEta = Math.max(0, ppTotals["GIFT MULTI"] - giftMultiDForEta - giftMultiEForEta);
+        totalWorkHours += (giftMultiNormalForEta / pphM) + (giftMultiDForEta / (pphM / 2)) + (giftMultiEForEta / (pphM * 2));
+
+        totalWorkHours += (ppTotals["NONSORT"] / pphN);
+
+        let etaHours = 0;
+        if (mevcutPersonel > 0) {
+            etaHours = totalWorkHours / mevcutPersonel;
+        }
+
+        document.getElementById('kpiEtaBox').innerHTML = `
+            <strong>⏱️ OPERASYONEL SÜRE SİMÜLASYONU (ETA)</strong>
+            Toplam iş yükü (D zone yarım hız ve NONSORT dahil) mevcut
+            <strong>${mevcutPersonel}</strong> personel ile yaklaşık
+            <span style="font-size:15px; font-weight:bold; color:var(--primary); display:block; margin-top:5px;">🕒 ${formatHoursToReadable(etaHours)}</span>
+            sürecektir.
+        `;
+
+        let calcStartInput = document.getElementById('calculationStartTime').value;
+        let currentTime = calcStartInput ? Date.parse(calcStartInput) : Date.now(); 
+
+        let simClock = currentTime; 
+        let backlogResults = {};
+        let totalBacklogSystemWide = 0;
+
+        let sortedCpts = Object.keys(cptData).map(Number).sort((a, b) => a - b);
+
+        sortedCpts.forEach(cpt => {
+            let targetTime = cpt - (15 * 60 * 1000); 
+
+            let totalWh_Cpt = 0;
+            let pathUnits = {};
+
+            PATH_GROUPS.forEach(p => {
+                let dQty = cptData[cpt][p].D;
+                let eQty = cptData[cpt][p].E;
+                let tQty = cptData[cpt][p].total;
+                let nQty = Math.max(0, tQty - dQty - eQty);
+                let wh = 0;
+                
+                if (p.includes("SINGLE")) wh = (nQty / pphS) + (dQty / (pphS / 2)) + (eQty / (pphS * 2));
+                else if (p.includes("MULTI")) wh = (nQty / pphM) + (dQty / (pphM / 2)) + (eQty / (pphM * 2));
+                else if (p === "NONSORT") wh = tQty / pphN;
+
+                pathUnits[p] = tQty;
+                totalWh_Cpt += wh;
+            });
+
+            let hoursNeeded = mevcutPersonel > 0 ? (totalWh_Cpt / mevcutPersonel) : 0;
+            
+            let startJobClock = simClock;
+            let endJobClock = simClock + (hoursNeeded * 3600000); 
+
+            backlogResults[cpt] = {};
+            let ratio = 0;
+
+            if (totalWh_Cpt > 0) {
+                if (endJobClock <= targetTime) {
+                    ratio = 0;
+                } else if (startJobClock >= targetTime) {
+                    ratio = 1.0;
+                } else {
+                    ratio = (endJobClock - targetTime) / (endJobClock - startJobClock);
+                }
+            }
+
+            PATH_GROUPS.forEach(p => {
+                let bUnits = Math.round(pathUnits[p] * ratio);
+                backlogResults[cpt][p] = bUnits;
+                totalBacklogSystemWide += bUnits;
+            });
+
+            simClock = endJobClock;
+        });
+
+        let backlogBoxContent = `<strong>🚨 ZAMAN ÇİZELGELİ KALAN İŞ (BACKLOG) TABLOSU</strong>`;
+        let hesaplamaSaatiStr = new Date(currentTime).toLocaleString('tr-TR', { day:'2-digit', month:'short', hour: '2-digit', minute:'2-digit' });
+
+        if (totalBacklogSystemWide <= 0) {
+             backlogBoxContent += `<div style="margin-top:10px; color:#166534;">✅ Güncelleme saati olan <strong>${hesaplamaSaatiStr}</strong> itibarıyla mevcut personel gücüyle tüm işler CPT hedeflerinden (15 dk pay dahil) önce bitiyor. Backlog bulunmamaktadır.</div>`;
+        } else {
+             backlogBoxContent += `<div style="margin-bottom:8px; font-size:12px;">Güncelleme saati olan <strong>${hesaplamaSaatiStr}</strong> baz alınarak, her CPT için kuyruk simülasyonu yapılmıştır. Toplam kalan iş: <strong>${totalBacklogSystemWide.toLocaleString()} adet</strong>.</div>`;
+             backlogBoxContent += `<div style="overflow-x: auto; max-width: 100%; border: 1px solid var(--border); border-radius: 6px;">
+                                     <table class="backlog-table" style="min-width: max-content; margin-top: 0; border: none;">
+                                         <thead>
+                                             <tr>
+                                                 <th style="position: sticky; left: 0; z-index: 2; background: var(--table-header); border-right: 2px solid var(--border);">Process Path</th>`;
+
+             sortedCpts.forEach(cpt => {
+                 let cptDate = new Date(cpt);
+                 let dayMonth = cptDate.toLocaleString('tr-TR', { day:'2-digit', month:'short' });
+                 let timeStr = cptDate.toLocaleString('tr-TR', { hour:'2-digit', minute:'2-digit' });
+                 backlogBoxContent += `<th><div style="font-size:10px; color:var(--text-muted);">${dayMonth}</div><div>${timeStr}</div></th>`;
+             });
+             backlogBoxContent += `</tr></thead><tbody>`;
+
+             PATH_GROUPS.forEach(p => {
+                 backlogBoxContent += `<tr><td style="font-weight:bold; background:var(--background); position: sticky; left: 0; border-right: 2px solid var(--border);">${p}</td>`;
+                 sortedCpts.forEach(cpt => {
+                     let val = backlogResults[cpt][p];
+                     let totalInCpt = cptData[cpt] && cptData[cpt][p] ? cptData[cpt][p].total : 0;
+                     
+                     if (totalInCpt === 0) {
+                         backlogBoxContent += `<td style="color:var(--text-muted); font-size:14px;">-</td>`;
+                     } else if (val > 0) {
+                         backlogBoxContent += `<td>
+                                                 <div style="color:#991b1b; font-weight:bold; background:#fee2e2; padding:2px 4px; border-radius:3px; display:inline-block;">${val} ad.</div>
+                                                 <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">/ ${totalInCpt} iş</div>
+                                               </td>`;
+                     } else {
+                         backlogBoxContent += `<td><span style="color:#10b981; font-weight:bold; font-size:14px;">✔</span></td>`;
+                     }
+                 });
+                 backlogBoxContent += `</tr>`;
+             });
+             backlogBoxContent += `</tbody></table></div>`;
+        }
+        document.getElementById('kpiBacklogBox').innerHTML = backlogBoxContent;
+
+        function runSmartAllocationEngine(pKey, templates, kVal, isGift = false) {
+            if (!templates || templates.length === 0) {
+                return { floorHTML: "<div>0 Kişi</div>", zoneHTML: "<div>0 Kişi</div>", count: 0 };
+            }
+
+            let basePPH = 1;
+            if (pKey.includes("SINGLE")) basePPH = parseFloat(document.getElementById('pphSingle').value) || 1;
+            if (pKey.includes("MULTI")) basePPH = parseFloat(document.getElementById('pphMulti').value) || 1;
+
+            let effectivePPH = basePPH * kVal;
+            let floorAdets = {};
+            FLOOR_HEADERS.forEach(f => { floorAdets[f] = floorMatrix[pKey][f]; });
+            let floorLines = [];
+            let zoneLines = [];
+            let totalCount = 0;
+            
+            templates.forEach(person => {
+                let currentPersonMaxCapacity = effectivePPH;
+                if (person.baseZonesOrdered && person.baseZonesOrdered.length === 1) {
+                    if (person.baseZonesOrdered[0][0] === "D") {
+                        currentPersonMaxCapacity = effectivePPH / 2;
+                    } else if (person.baseZonesOrdered[0][0] === "E") {
+                        currentPersonMaxCapacity = effectivePPH * 2; 
+                    }
+                }
+
+                let assignedFloorsForThisPerson = [];
+                let totalAssignedQtyForThisPerson = 0;
+
+                for (let poolIndex = 0; poolIndex < person.baseZonesOrdered.length; poolIndex++) {
+                    if (totalAssignedQtyForThisPerson >= currentPersonMaxCapacity) break;
+                    let currentPoolSubZones = person.baseZonesOrdered[poolIndex];
+   
+                    let allowedFloorsInThisPool = FLOOR_HEADERS.filter(f => {
+                        if (isGift) return true;
+                        return currentPoolSubZones.some(z => {
+                            if (z === "A-HRV") return f === "A-HRV";
+                            if (z === "M") return f.endsWith("-M");
+                            if (z === "E") return f.endsWith("-E");
+                            if (z === "D") return f.endsWith("-D");
+                            return f.endsWith("-" + z) && f !== "A-HRV";
+                        });
+                    });
+
+                    let loopGuard = 0;
+                    while (totalAssignedQtyForThisPerson < currentPersonMaxCapacity && loopGuard < 100) {
+                        loopGuard++;
+                        let remainingCapacity = currentPersonMaxCapacity - totalAssignedQtyForThisPerson;
+                        let validFloorsWithQty = allowedFloorsInThisPool
+                            .map(f => ({ name: f, qty: floorAdets[f] || 0 }))
+                            .filter(f => f.qty > 0.05);
+                        if (validFloorsWithQty.length === 0) break;
+
+                        validFloorsWithQty.sort((a, b) => b.qty - a.qty);
+                        let targetFloor = validFloorsWithQty[0];
+                        let qtyToTake = Math.min(remainingCapacity, targetFloor.qty);
+                        if (qtyToTake <= 0) break;
+
+                        floorAdets[targetFloor.name] -= qtyToTake;
+                        totalAssignedQtyForThisPerson += qtyToTake;
+                        assignedFloorsForThisPerson.push({ name: targetFloor.name, qty: qtyToTake });
+                    }
+                }
+
+                let actualZonesDetected = new Set();
+                assignedFloorsForThisPerson.forEach(item => { 
+                    let zoneName = item.name === "A-HRV" ? "A-HRV" : item.name.split('-')[1];
+                    actualZonesDetected.add(zoneName); 
+                });
+                let actualZonesList = Array.from(actualZonesDetected).sort();
+                let actualZoneLabel = actualZonesList.join(" - ");
+                if (actualZonesList.length === 0) {
+                    if(person.baseZonesOrdered && person.baseZonesOrdered[0]) {
+                        actualZoneLabel = person.baseZonesOrdered[0][0];
+                    } else {
+                        actualZoneLabel = person.baseLabel || "Belirsiz";
+                    }
+                }
+
+                let isActuallyFixed = actualZonesList.length <= 1;
+                let zoneBadge = isGift ? '<span class="badge-gift">GIFT</span>' : (isActuallyFixed ? '<span class="badge-fixed">Sabit</span>' : '<span class="badge-flex">Esnek</span>');
+                zoneLines.push(`<div>1 Kişi (${actualZoneLabel}) ${zoneBadge}</div>`);
+                let floorStr = "";
+                let qtyStr = "0.0";
+
+                if (assignedFloorsForThisPerson.length > 0) {
+                    let summary = {};
+                    assignedFloorsForThisPerson.forEach(item => { summary[item.name] = (summary[item.name] || 0) + item.qty; });
+                    floorStr = Object.keys(summary).sort().join(" / ");
+                    qtyStr = Object.values(summary).reduce((a, b) => a + b, 0).toFixed(1);
+                } else {
+                    if(person.baseZonesOrdered && person.baseZonesOrdered[0]) {
+                        let fallbackSubZones = person.baseZonesOrdered[0];
+                        floorStr = FLOOR_HEADERS.filter(f => fallbackSubZones.some(z => {
+                            if (z === "A-HRV") return f === "A-HRV";
+                            if (z === "M") return f.endsWith("-M");
+                            if (z === "E") return f.endsWith("-E");
+                            if (z === "D") return f.endsWith("-D");
+                            return f.endsWith("-" + z) && f !== "A-HRV";
+                        })).join(" / ");
+                    } else {
+                        floorStr = "Kat Yok";
+                    }
+                }
+
+                let floorBadge = isGift ? '<span class="badge-gift">GIFT</span>' : (isActuallyFixed ? '<span class="badge-fixed">Sabit Kat</span>' : '<span class="badge-flex">Esnek Kat</span>');
+                floorLines.push(`<div>1 Kişi (${floorStr}) [${qtyStr} Adet] (${actualZoneLabel}) ${floorBadge}</div>`);
+                totalCount++;
+            });
+
+            return { floorHTML: floorLines.join(''), zoneHTML: zoneLines.join(''), count: totalCount };
+        }
+
+        let singleResult = runSmartAllocationEngine("SINGLE", singleTemplates, 1);
+        let multiResult = runSmartAllocationEngine("MULTI", multiTemplates, 1);
+        let nonsortZoneLines = [];
+        let nonsortFloorLines = [];
+        let nonsortTotalCount = 0;
+        Object.keys(nonsortBatches).forEach(bId => {
+            let sortedZones = Array.from(nonsortBatches[bId].zones).sort().join(' - ');
+            let sortedFloors = Array.from(nonsortBatches[bId].floors).sort().join(' / ');
+            let qty = nonsortBatches[bId].qty;
+
+            nonsortZoneLines.push(`<div>1 Kişi (${sortedZones}) (${bId}) <span class="badge-ns">Batch</span></div>`);
+            nonsortFloorLines.push(`<div>1 Kişi (${sortedFloors}) [${qty.toFixed(1)} Adet] (${bId}) <span class="badge-ns">Batch</span></div>`);
+            nonsortTotalCount++;
+        });
+        if(nonsortTotalCount === 0) {
+            nonsortZoneLines.push('<div>0 Kişi</div>');
+            nonsortFloorLines.push('<div>0 Kişi</div>');
+        }
+
+        let giftSingleUnits = Object.values(zoneMatrix["GIFT SINGLE"]).reduce((a,b)=>a+b, 0);
+        let giftSingleHC = giftSingleUnits > 0 ? Math.ceil(giftSingleUnits / pphS) : 0;
+        let giftMultiUnits = Object.values(zoneMatrix["GIFT MULTI"]).reduce((a,b)=>a+b, 0);
+        let giftMultiHC = giftMultiUnits > 0 ? Math.ceil(giftMultiUnits / pphM) : 0;
+        let giftSingleTemplates = Array.from({ length: giftSingleHC }, () => ({ baseZonesOrdered: [ZONE_HEADERS], baseLabel: "A-B-C-D-M-E" }));
+        let giftMultiTemplates = Array.from({ length: giftMultiHC }, () => ({ baseZonesOrdered: [ZONE_HEADERS], baseLabel: "A-B-C-D-M-E" }));
+        let giftSingleResult = runSmartAllocationEngine("GIFT SINGLE", giftSingleTemplates, 1, true);
+        let giftMultiResult = runSmartAllocationEngine("GIFT MULTI", giftMultiTemplates, 1, true);
+        
+        function groupZoneAssignments(html) {
+            const counts = {};
+            const badges = {};
+            const matches = html.matchAll(/<div>1 Kişi \((.*?)\)\s*(<span class="badge-[^"]+">.*?<\/span>)?<\/div>/g);
+
+            for (const m of matches) {
+                const zone = m[1].trim();
+                const badge = m[2] || "";
+                const key = zone + "||" + badge;
+
+                counts[key] = (counts[key] || 0) + 1;
+                badges[key] = { zone, badge };
+            }
+
+            return Object.keys(counts).map(key => {
+                return `<div>${counts[key]} Kişi (${badges[key].zone}) ${badges[key].badge}</div>`;
+            }).join('');
+        }
+
+        let f = selectedProcessPathFilter;
+        
+        document.getElementById('wfZoneGrid').innerHTML = `
+            <div class="wf-column-box ${f && f!=='SINGLE' ? 'dimmed':''}"><div class="wf-column-header">SINGLE</div><div class="wf-column-body">${groupZoneAssignments(singleResult.zoneHTML)}</div><div class="wf-total-row">TOTAL: ${singleResult.count}</div></div>
+            <div class="wf-column-box ${f && f!=='MULTI' ? 'dimmed':''}"><div class="wf-column-header">MULTI</div><div class="wf-column-body">${groupZoneAssignments(multiResult.zoneHTML)}</div><div class="wf-total-row">TOTAL: ${multiResult.count}</div></div>
+            <div class="wf-column-box ${f && f!=='NONSORT' ? 'dimmed':''}"><div class="wf-column-header">NONSORT</div><div class="wf-column-body">${groupZoneAssignments(nonsortZoneLines.join(''))}</div><div class="wf-total-row">TOTAL: ${nonsortTotalCount}</div></div>
+            <div class="wf-column-box ${f && f!=='GIFT SINGLE' ? 'dimmed':''}"><div class="wf-column-header">GIFT SINGLE</div><div class="wf-column-body">${groupZoneAssignments(giftSingleResult.zoneHTML)}</div><div class="wf-total-row">TOTAL: ${giftSingleResult.count}</div></div>
+            <div class="wf-column-box ${f && f!=='GIFT MULTI' ? 'dimmed':''}"><div class="wf-column-header">GIFT MULTI</div><div class="wf-column-body">${groupZoneAssignments(giftMultiResult.zoneHTML)}</div><div class="wf-total-row">TOTAL: ${giftMultiResult.count}</div></div>
+        `;
+
+        document.getElementById('wfFloorGrid').innerHTML = `
+            <div class="wf-column-box ${f && f!=='SINGLE' ? 'dimmed':''}"><div class="wf-column-header">SINGLE KAT</div><div class="wf-column-body">${singleResult.floorHTML}</div><div class="wf-total-row">TOTAL: ${singleResult.count}</div></div>
+            <div class="wf-column-box ${f && f!=='MULTI' ? 'dimmed':''}"><div class="wf-column-header">MULTI KAT</div><div class="wf-column-body">${multiResult.floorHTML}</div><div class="wf-total-row">TOTAL: ${multiResult.count}</div></div>
+            <div class="wf-column-box ${f && f!=='NONSORT' ? 'dimmed':''}"><div class="wf-column-header">NONSORT KAT</div><div class="wf-column-body">${nonsortFloorLines.join('')}</div><div class="wf-total-row">TOTAL: ${nonsortTotalCount}</div></div>
+            <div class="wf-column-box ${f && f!=='GIFT SINGLE' ? 'dimmed':''}"><div class="wf-column-header">GIFT SINGLE KAT</div><div class="wf-column-body">${giftSingleResult.floorHTML}</div><div class="wf-total-row">TOTAL: ${giftSingleResult.count}</div></div>
+            <div class="wf-column-box ${f && f!=='GIFT MULTI' ? 'dimmed':''}"><div class="wf-column-header">GIFT MULTI KAT</div><div class="wf-column-body">${giftMultiResult.floorHTML}</div><div class="wf-total-row">TOTAL: ${giftMultiResult.count}</div></div>
+        `;
+    }
+</script>
+
+</body>
+</html>

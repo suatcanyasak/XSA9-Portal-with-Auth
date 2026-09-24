@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packing Performance Dashboard Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+        }
+        .table-container {
+            max-width: 100%;
+            overflow-x: auto;
+            margin-bottom: 2rem;
+        }
+        table { border-collapse: separate; border-spacing: 0; min-width: 100%; }
+        th, td {
+            padding: 0.25rem 0.5rem;
+            text-align: center;
+            min-width: 60px;
+            font-size: 0.85rem;
+            border-right: 1px solid var(--border-color, #000);
+            border-bottom: 1px solid var(--border-color, #000);
+        }
+        th { font-weight: bold; }
+        
+        tr:last-child td { border-bottom: none; }
+        td:last-child, th:last-child { border-right: none; }
+        
+        ::-webkit-scrollbar { height: 12px; width: 12px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        [contenteditable="true"] { outline: none; cursor: text; transition: background 0.2s; }
+        [contenteditable="true"]:focus { background-color: #fef08a !important; color: #000 !important; }
+
+        /* Hatalı veri vurgusu (Anomali) */
+        .input-error {
+            background-color: #fee2e2 !important;
+            border: 2px solid #dc2626 !important;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 transition-colors duration-200">
+
+    <div class="max-w-[1400px] mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold">Packing Performance Dashboard Pro</h1>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Vardiya ve performans takip sistemi</p>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <button onclick="toggleDarkMode()" class="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 font-semibold py-2 px-3 rounded-md shadow-sm transition flex items-center gap-2">
+                    <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <span id="themeText">Mod</span>
+                </button>
+
+                <div class="bg-white dark:bg-slate-800 p-2 rounded-md shadow-sm border border-slate-300 dark:border-slate-700 flex items-center gap-2">
+                    <label class="text-sm font-medium whitespace-nowrap">CSV Yükle:</label>
+                    <input type="file" id="csvFileInput" accept=".csv" onchange="processCSV()" class="block w-full text-sm text-slate-500 dark:text-slate-400
+                        file:mr-2 file:py-1 file:px-2
+                        file:rounded file:border-0
+                        file:text-xs file:font-semibold
+                        file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900 dark:file:text-blue-200
+                        hover:file:bg-blue-100 cursor-pointer"/>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button onclick="exportToExcel()" title="Excel İndir" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 rounded-md shadow-sm transition flex items-center gap-1 text-sm">
+                        Excel
+                    </button>
+                    <button onclick="exportToPDF()" title="PDF İndir" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 px-3 rounded-md shadow-sm transition flex items-center gap-1 text-sm">
+                        PDF
+                    </button>
+                </div>
+
+                <button onclick="clearStorage()" class="bg-red-50 dark:bg-red-950/40 hover:bg-red-100 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 font-semibold py-2 px-3 rounded-md shadow-sm transition flex items-center gap-1 text-sm">
+                    Temizle
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+            <div class="lg:col-span-2 bg-white dark:bg-slate-800 p-4 rounded-md shadow-sm border border-slate-300 dark:border-slate-700 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wider">Vardiya Seçimi</h2>
+                    <div class="flex flex-wrap gap-2" id="shiftButtons">
+                        <button onclick="switchShift('07:00', '15:00')" class="shift-btn px-3 py-2 rounded border font-medium text-sm transition" data-shift="07:00-15:00">07:00 - 15:00</button>
+                        <button onclick="switchShift('15:00', '23:00')" class="shift-btn px-3 py-2 rounded border font-medium text-sm transition" data-shift="15:00-23:00">15:00 - 23:00</button>
+                        <button onclick="switchShift('23:00', '07:00')" class="shift-btn px-3 py-2 rounded border font-medium text-sm transition" data-shift="23:00-07:00">23:00 - 07:00</button>
+                        <button onclick="switchShift('07:00', '19:00')" class="shift-btn px-3 py-2 rounded border font-medium text-sm transition" data-shift="07:00-19:00">07:00 - 19:00</button>
+                        <button onclick="switchShift('19:00', '07:00')" class="shift-btn px-3 py-2 rounded border font-medium text-sm transition" data-shift="19:00-07:00">19:00 - 07:00</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-md shadow-sm border border-slate-300 dark:border-slate-700 flex flex-col justify-between">
+                <h2 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">Dinamik Hedef Hesaplayıcı</h2>
+                
+                <!-- STANDART VARDİYALAR İÇİN TEKLİ HESAPLAYICI -->
+                <div id="singleCalculator" class="space-y-3">
+                    <div>
+                        <label class="text-[10px] font-semibold text-slate-500 block mb-1">Today's IPT Ship Plan (00:00 Hedefi)</label>
+                        <input type="number" id="iptTargetInput" placeholder="Örn: 22000" class="text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1.5 w-full font-bold text-blue-600 dark:text-blue-400" oninput="calculateDynamicTargets()">
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <label class="text-[10px] font-semibold text-slate-500 block mb-1">Günlük Total Mola (Dk)</label>
+                            <input type="number" id="totalBreakInput" value="180" class="text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1.5 w-full" oninput="calculateDynamicTargets()">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-[10px] font-semibold text-slate-500 block mb-1">Yapılan Mola (Dk)</label>
+                            <input type="number" id="takenBreakInput" placeholder="Örn: 165" value="0" class="text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1.5 w-full" oninput="calculateDynamicTargets()">
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center text-[10.5px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-900 p-1.5 rounded">
+                        <span id="dynamicStatusText">Hedef Bekleniyor...</span>
+                    </div>
+                </div>
+
+                <!-- GÜN GEÇİŞLİ VARDİYALAR İÇİN ÇİFTLİ HESAPLAYICI -->
+                <div id="dualCalculator" class="space-y-2 hidden">
+                    <!-- GÜN 1 -->
+                    <div class="border-b border-slate-200 dark:border-slate-700 pb-1 mb-1">
+                        <span class="text-[11px] font-bold text-slate-700 dark:text-slate-300">Gün 1 (00:00 Öncesi)</span>
+                        <div class="mt-1">
+                            <input type="number" id="iptTargetInput_day1" placeholder="Gün 1 Hedefi (Örn: 22000)" class="text-[11px] bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 w-full font-bold text-blue-600 dark:text-blue-400" oninput="calculateDynamicTargets()">
+                        </div>
+                        <div class="flex gap-2 mt-1">
+                            <div class="flex-1">
+                                <label class="text-[9px] font-semibold text-slate-500 block">Total Mola(Dk)</label>
+                                <input type="number" id="totalBreakInput_day1" value="45" class="text-[11px] bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 w-full" oninput="calculateDynamicTargets()">
+                            </div>
+                            <div class="flex-1">
+                                <label class="text-[9px] font-semibold text-slate-500 block">Yapılan Mola</label>
+                                <input type="number" id="takenBreakInput_day1" placeholder="0" value="0" class="text-[11px] bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 w-full" oninput="calculateDynamicTargets()">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- GÜN 2 -->
+                    <div>
+                        <span class="text-[11px] font-bold text-slate-700 dark:text-slate-300">Gün 2 (00:00 Sonrası)</span>
+                        <div class="mt-1">
+                            <input type="number" id="iptTargetInput_day2" placeholder="Gün 2 Hedefi (Örn: 25000)" class="text-[11px] bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 w-full font-bold text-blue-600 dark:text-blue-400" oninput="calculateDynamicTargets()">
+                        </div>
+                        <div class="flex gap-2 mt-1">
+                            <div class="flex-1">
+                                <label class="text-[9px] font-semibold text-slate-500 block">Total Mola(Dk)</label>
+                                <input type="number" id="totalBreakInput_day2" value="45" class="text-[11px] bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 w-full" oninput="calculateDynamicTargets()">
+                            </div>
+                            <div class="flex-1">
+                                <label class="text-[9px] font-semibold text-slate-500 block">Yapılan Mola</label>
+                                <input type="number" id="takenBreakInput_day2" placeholder="0" value="0" class="text-[11px] bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 w-full" oninput="calculateDynamicTargets()">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-900 p-1 rounded mt-1">
+                        <span id="dynamicStatusTextDual">Hedef Bekleniyor...</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-md shadow-sm border border-slate-300 dark:border-slate-700 flex flex-col justify-center items-center text-center">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Vardiya Hedef Tamamlanma Oranı</span>
+                <div id="oeeScoreDisplay" class="text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">%0.0</div>
+                <span id="oeeStatusText" class="text-xs text-slate-400 mt-1">Hedef Bekleniyor</span>
+            </div>
+        </div>
+
+        <div id="dashboardArea">
+            <div class="text-center py-12 text-slate-500 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                Lütfen bir vardiya seçin.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSlots = [];
+        let currentShiftStart = "";
+        let currentShiftEnd = "";
+        
+        let defaultTargets = { total: 0, multis: 0, singles: 0, fracs: 0 };
+        let defaultTargetsDay1 = { total: 0, multis: 0, singles: 0, fracs: 0 };
+        let defaultTargetsDay2 = { total: 0, multis: 0, singles: 0, fracs: 0 };
+        
+        let shiftDataStore = {}; 
+        let isInitializing = false; 
+        let chartInstances = {}; 
+
+        function initDarkMode() {
+            if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeText').innerText = 'Aydınlık';
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('themeText').innerText = 'Karanlık';
+            }
+        }
+
+        function toggleDarkMode() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                document.getElementById('themeText').innerText = 'Karanlık';
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                document.getElementById('themeText').innerText = 'Aydınlık';
+            }
+            updateChartsTheme();
+        }
+
+        function getChartColors() {
+            const isDark = document.documentElement.classList.contains('dark');
+            return {
+                gridColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#f1f1f1',
+                textColor: isDark ? '#cbd5e1' : '#64748b'
+            };
+        }
+
+        function updateChartsTheme() {
+            const colors = getChartColors();
+            Object.keys(chartInstances).forEach(key => {
+                const chart = chartInstances[key];
+                if (chart && chart.options.scales) {
+                    if (chart.options.scales.x) chart.options.scales.x.grid.color = colors.gridColor;
+                    if (chart.options.scales.y) chart.options.scales.y.grid.color = colors.gridColor;
+                    chart.update();
+                }
+            });
+        }
+
+        const breakHighlightPlugin = {
+            id: 'breakHighlight',
+            beforeDraw(chart) {
+                const { ctx, chartArea: { top, bottom, left, right }, scales: { x } } = chart;
+                if (!x) return;
+                
+                currentSlots.forEach((slot, i) => {
+                    if (i === 0) return; 
+                    let breakCells = document.querySelectorAll(`.break-cell-${i}`);
+                    let isBreak = breakCells.length > 0 && breakCells[0].innerText.trim() === 'X';
+                    if (isBreak) {
+                        const startX = x.getPixelForValue(i - 1);
+                        const endX = x.getPixelForValue(i);
+                        
+                        ctx.save();
+                        ctx.fillStyle = 'rgba(254, 240, 138, 0.3)';
+                        ctx.fillRect(startX, top, endX - startX, bottom - top);
+                        ctx.restore();
+                    }
+                });
+            }
+        };
+
+        function generateTimeSlots(start, end) {
+            const slots = [];
+            let [startHr, startMin] = start.split(':').map(Number);
+            let [endHr, endMin] = end.split(':').map(Number);
+            
+            let currentHr = startHr;
+            let currentMin = startMin;
+            let ended = false;
+
+            while (!ended) {
+                let hrStr = currentHr.toString().padStart(2, '0');
+                let minStr = currentMin.toString().padStart(2, '0');
+                slots.push(`${hrStr}:${minStr}`);
+                
+                currentMin += 15;
+                if (currentMin >= 60) {
+                    currentMin = 0;
+                    currentHr += 1;
+                    if (currentHr >= 24) currentHr = 0;
+                }
+
+                if (currentHr === endHr && currentMin === endMin) {
+                    let endHrStr = currentHr.toString().padStart(2, '0');
+                    let endMinStr = currentMin.toString().padStart(2, '0');
+                    slots.push(`${endHrStr}:${endMinStr}`);
+                    ended = true;
+                }
+            }
+            return slots;
+        }
+
+        function switchShift(start, end) {
+            if (currentShiftStart && currentShiftEnd) {
+                saveCurrentShiftToStore();
+            }
+            setShift(start, end);
+        }
+
+        function setShift(start, end, skipStoreSave = false) {
+            if (!skipStoreSave && currentShiftStart && currentShiftEnd) {
+                saveCurrentShiftToStore();
+            }
+
+            currentShiftStart = start;
+            currentShiftEnd = end;
+
+            const singleCalc = document.getElementById('singleCalculator');
+            const dualCalc = document.getElementById('dualCalculator');
+            
+            if (start === '23:00' || start === '19:00') {
+                singleCalc.classList.add('hidden');
+                dualCalc.classList.remove('hidden');
+            } else {
+                singleCalc.classList.remove('hidden');
+                dualCalc.classList.add('hidden');
+            }
+            
+            document.querySelectorAll('.shift-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-800', 'text-white', 'border-slate-800', 'dark:bg-slate-200', 'dark:text-slate-900');
+                btn.classList.add('border-slate-300', 'text-slate-700', 'dark:text-slate-300', 'bg-white', 'dark:bg-slate-800', 'hover:bg-slate-50', 'dark:hover:bg-slate-700');
+                if (btn.getAttribute('data-shift') === `${start}-${end}`) {
+                    btn.classList.add('bg-slate-800', 'text-white', 'border-slate-800', 'dark:bg-slate-200', 'dark:text-slate-900');
+                    btn.classList.remove('border-slate-300', 'text-slate-700', 'dark:text-slate-300', 'bg-white', 'dark:bg-slate-800', 'hover:bg-slate-50', 'dark:hover:bg-slate-700');
+                }
+            });
+
+            currentSlots = generateTimeSlots(start, end);
+            renderDashboard(false); 
+            
+            const shiftKey = `${start}-${end}`;
+            if (shiftDataStore[shiftKey]) {
+                loadShiftFromStore(shiftKey);
+            } else {
+                recalculateAll();
+            }
+            saveToStorage();
+            calculateDynamicTargets();
+        }
+
+        function toggleBreak(index) {
+            if (index === 0) return; 
+            
+            let cells = document.querySelectorAll(`.break-cell-${index}`);
+            if (cells.length === 0) return;
+            
+            let isBreak = cells[0].innerText.trim() === 'X';
+            
+            cells.forEach(cell => {
+                if (isBreak) {
+                    cell.innerText = '';
+                    cell.classList.remove('bg-[#fef08a]', 'text-black');
+                } else {
+                    cell.innerText = 'X';
+                    cell.classList.add('bg-[#fef08a]', 'text-black');
+                }
+            });
+            
+            ['total', 'multis', 'singles', 'fracs'].forEach(cat => {
+                let el = document.getElementById(`target15_${cat}_${index}`);
+                if (el) {
+                    let currentCatTarget = defaultTargets[cat] || 0;
+                    if (currentShiftStart === '23:00' || currentShiftStart === '19:00') {
+                        let midIndex = currentSlots.indexOf("00:00");
+                        if (index <= midIndex) {
+                            currentCatTarget = defaultTargetsDay1[cat] || 0;
+                        } else {
+                            currentCatTarget = defaultTargetsDay2[cat] || 0;
+                        }
+                    }
+                    el.innerText = isBreak ? currentCatTarget : 0;
+                }
+            });
+            
+            recalculateAll();
+        }
+
+        function calculateDualDynamicTargets() {
+            const iptPlanInput1 = document.getElementById('iptTargetInput_day1');
+            const iptPlanInput2 = document.getElementById('iptTargetInput_day2');
+            if (!iptPlanInput1 || !iptPlanInput2) return;
+            
+            const val1 = iptPlanInput1.value;
+            const val2 = iptPlanInput2.value;
+
+            let midIndex = currentSlots.indexOf("00:00");
+            if (midIndex === -1) return; 
+
+            let errorMsg = "";
+
+            let target15Total1 = 0, target15Multis1 = 0, target15Singles1 = 0;
+            if (val1 !== "" && !isNaN(val1)) {
+                const iptPlan1 = parseInt(val1);
+                const totalBreak1 = parseInt(document.getElementById('totalBreakInput_day1').value) || 0;
+                const takenBreak1 = parseInt(document.getElementById('takenBreakInput_day1').value) || 0;
+
+                let minsToMidnight = midIndex * 15;
+                let remainingBreak1 = Math.max(0, totalBreak1 - takenBreak1);
+                let netActiveMins1 = minsToMidnight - remainingBreak1;
+
+                if (netActiveMins1 > 0) {
+                    let startUnitsStr1 = document.getElementById('top_total_0')?.innerText;
+                    let startUnits1 = (startUnitsStr1 && !isNaN(parseInt(startUnitsStr1))) ? parseInt(startUnitsStr1) : 0;
+                    let remainingTarget1 = Math.max(0, iptPlan1 - startUnits1);
+                    
+                    let intervalCount1 = netActiveMins1 / 15;
+                    target15Total1 = Math.round(remainingTarget1 / intervalCount1);
+                    target15Multis1 = Math.round(target15Total1 * 0.6);
+                    target15Singles1 = target15Total1 - target15Multis1;
+
+                    defaultTargetsDay1.total = target15Total1;
+                    defaultTargetsDay1.multis = target15Multis1;
+                    defaultTargetsDay1.singles = target15Singles1;
+                    defaultTargetsDay1.fracs = 0;
+                } else {
+                    errorMsg += "G1 Net Süre Yetersiz. ";
+                }
+            }
+
+            let target15Total2 = 0, target15Multis2 = 0, target15Singles2 = 0;
+            if (val2 !== "" && !isNaN(val2)) {
+                const iptPlan2 = parseInt(val2);
+                const totalBreak2 = parseInt(document.getElementById('totalBreakInput_day2').value) || 0;
+                const takenBreak2 = parseInt(document.getElementById('takenBreakInput_day2').value) || 0;
+
+                let minsAfterMidnight = 1440; 
+                let remainingBreak2 = Math.max(0, totalBreak2 - takenBreak2);
+                let netActiveMins2 = minsAfterMidnight - remainingBreak2;
+
+                if (netActiveMins2 > 0) {
+                    let startUnits2 = 0; 
+                    let remainingTarget2 = Math.max(0, iptPlan2 - startUnits2);
+                    
+                    let intervalCount2 = netActiveMins2 / 15;
+                    target15Total2 = Math.round(remainingTarget2 / intervalCount2);
+                    target15Multis2 = Math.round(target15Total2 * 0.6);
+                    target15Singles2 = target15Total2 - target15Multis2;
+
+                    defaultTargetsDay2.total = target15Total2;
+                    defaultTargetsDay2.multis = target15Multis2;
+                    defaultTargetsDay2.singles = target15Singles2;
+                    defaultTargetsDay2.fracs = 0;
+                } else {
+                    errorMsg += "G2 Net Süre Yetersiz.";
+                }
+            }
+
+            for (let i = 1; i < currentSlots.length; i++) {
+                let isDay1 = i <= midIndex;
+                let tTotal = isDay1 ? target15Total1 : target15Total2;
+                let tMultis = isDay1 ? target15Multis1 : target15Multis2;
+                let tSingles = isDay1 ? target15Singles1 : target15Singles2;
+
+                let targetTotalCell = document.getElementById(`target15_total_${i}`);
+                let targetMultisCell = document.getElementById(`target15_multis_${i}`);
+                let targetSinglesCell = document.getElementById(`target15_singles_${i}`);
+                let targetFracsCell = document.getElementById(`target15_fracs_${i}`);
+                
+                let breakCells = document.querySelectorAll(`.break-cell-${i}`);
+                let isBreak = breakCells.length > 0 && breakCells[0].innerText.trim() === 'X';
+
+                if (targetTotalCell && !isBreak) targetTotalCell.innerText = tTotal;
+                if (targetMultisCell && !isBreak) targetMultisCell.innerText = tMultis;
+                if (targetSinglesCell && !isBreak) targetSinglesCell.innerText = tSingles;
+                if (targetFracsCell && !isBreak) targetFracsCell.innerText = 0;
+            }
+
+            let statusEl = document.getElementById('dynamicStatusTextDual');
+            if (errorMsg) {
+                statusEl.innerHTML = `<span class="text-rose-600">${errorMsg}</span>`;
+            } else {
+                statusEl.innerHTML = `
+                    <div class="flex flex-col gap-1 w-full text-[9px]">
+                        <span class="text-emerald-600 dark:text-emerald-400">G1: Total:<b>${target15Total1}</b> | Mul:<b>${target15Multis1}</b> | Sgl:<b>${target15Singles1}</b></span>
+                        <span class="text-emerald-600 dark:text-emerald-400">G2: Total:<b>${target15Total2}</b> | Mul:<b>${target15Multis2}</b> | Sgl:<b>${target15Singles2}</b></span>
+                    </div>`;
+            }
+
+            recalculateAll();
+            saveToStorage();
+        }
+
+        function calculateDynamicTargets() {
+            if (!currentShiftStart) return;
+            
+            if (currentShiftStart === '23:00' || currentShiftStart === '19:00') {
+                calculateDualDynamicTargets();
+                return;
+            }
+            
+            const iptPlanInput = document.getElementById('iptTargetInput');
+            if (!iptPlanInput) return;
+            
+            const val = iptPlanInput.value;
+            if (val === "" || isNaN(val)) {
+                document.getElementById('dynamicStatusText').innerText = "Hesaplama için IPT planı bekleniyor...";
+                return;
+            }
+
+            const iptPlan = parseInt(val);
+            const totalBreak = parseInt(document.getElementById('totalBreakInput').value) || 0;
+            const takenBreak = parseInt(document.getElementById('takenBreakInput').value) || 0;
+
+            const [startHr, startMin] = currentShiftStart.split(':').map(Number);
+            
+            let hoursToMidnight = 24 - startHr;
+            let minsToMidnight = (hoursToMidnight * 60) - startMin;
+
+            let remainingBreak = totalBreak - takenBreak;
+            if (remainingBreak < 0) remainingBreak = 0;
+
+            let netActiveMins = minsToMidnight - remainingBreak;
+
+            if (netActiveMins <= 0) {
+                document.getElementById('dynamicStatusText').innerHTML = `<span class="text-rose-600">Hata: Net çalışma süresi 0 veya daha az.</span>`;
+                return;
+            }
+
+            let startUnitsStr = document.getElementById('top_total_0')?.innerText;
+            let startUnits = (startUnitsStr && !isNaN(parseInt(startUnitsStr))) ? parseInt(startUnitsStr) : 0;
+
+            let remainingTarget = iptPlan - startUnits;
+            if (remainingTarget < 0) remainingTarget = 0;
+
+            let intervalCount = netActiveMins / 15;
+
+            let target15Total = Math.round(remainingTarget / intervalCount);
+            let target15Multis = Math.round(target15Total * 0.6);
+            let target15Singles = Math.round(target15Total * 0.4);
+
+            if ((target15Multis + target15Singles) !== target15Total) {
+                target15Singles = target15Total - target15Multis;
+            }
+
+            defaultTargets.total = target15Total;
+            defaultTargets.multis = target15Multis;
+            defaultTargets.singles = target15Singles;
+            defaultTargets.fracs = 0;
+
+            for (let i = 1; i < currentSlots.length; i++) {
+                let targetTotalCell = document.getElementById(`target15_total_${i}`);
+                let targetMultisCell = document.getElementById(`target15_multis_${i}`);
+                let targetSinglesCell = document.getElementById(`target15_singles_${i}`);
+                let targetFracsCell = document.getElementById(`target15_fracs_${i}`);
+                
+                let breakCells = document.querySelectorAll(`.break-cell-${i}`);
+                let isBreak = breakCells.length > 0 && breakCells[0].innerText.trim() === 'X';
+
+                if (targetTotalCell && !isBreak) targetTotalCell.innerText = target15Total;
+                if (targetMultisCell && !isBreak) targetMultisCell.innerText = target15Multis;
+                if (targetSinglesCell && !isBreak) targetSinglesCell.innerText = target15Singles;
+                if (targetFracsCell && !isBreak) targetFracsCell.innerText = 0;
+            }
+
+            document.getElementById('dynamicStatusText').innerHTML = 
+                `<span class="text-emerald-600 dark:text-emerald-400">Güncellendi: Total: <b>${target15Total}</b> | Multi: <b>${target15Multis}</b> | Single: <b>${target15Singles}</b> (15Dk)</span>`;
+
+            recalculateAll();
+            saveToStorage(); 
+        }
+
+        function renderDashboard(autoRecalculate = true) {
+            const container = document.getElementById('dashboardArea');
+            if (currentSlots.length === 0) return;
+
+            let html = '';
+
+            html += `
+            <div class="table-container border-[3px] border-red-600 mb-2 shadow-md bg-white dark:bg-slate-800 rounded">
+                <table class="w-full whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-[#bfdbfe] dark:bg-blue-950 text-black dark:text-blue-200">
+                            <th class="sticky-col bg-[#bfdbfe] dark:bg-blue-950">DATE</th>
+                            ${currentSlots.map(slot => `<th class="text-red-600 dark:text-red-400 border-b-[2px] border-black dark:border-slate-600">${slot.replace(':', '.')}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="sticky-col bg-white dark:bg-slate-800 font-semibold">Ship Units (So Far)</td>
+                            ${currentSlots.map((slot, i) => `<td contenteditable="true" id="top_total_${i}"></td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="sticky-col bg-white dark:bg-slate-800 font-semibold">Ship Units - Multis</td>
+                            ${currentSlots.map((slot, i) => `<td contenteditable="true" id="top_multis_${i}"></td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="sticky-col bg-white dark:bg-slate-800 font-semibold">Ship Units - Singles</td>
+                            ${currentSlots.map((slot, i) => `<td contenteditable="true" id="top_singles_${i}"></td>`).join('')}
+                        </tr>
+                        <tr class="bg-gray-50 dark:bg-slate-800/50">
+                            <td class="sticky-col bg-gray-50 dark:bg-slate-800 font-semibold text-gray-600 dark:text-slate-400">Shipments So Far incl. FRACS</td>
+                            ${currentSlots.map((slot, i) => `<td contenteditable="true" class="text-gray-600 dark:text-slate-400" id="top_fracs_${i}"></td>`).join('')}
+                        </tr>
+                        <tr class="bg-gray-50 dark:bg-slate-800/50">
+                            <td class="sticky-col bg-gray-50 dark:bg-slate-800 font-semibold text-gray-600 dark:text-slate-400">Projected Shipments (linear)</td>
+                            ${currentSlots.map((slot, i) => `<td contenteditable="true" class="text-gray-600 dark:text-slate-400" id="top_projected_${i}"></td>`).join('')}
+                        </tr>
+                        <tr class="bg-gray-50 dark:bg-slate-800/50 border-t border-black dark:border-slate-700">
+                            <td class="sticky-col bg-gray-50 dark:bg-slate-800 font-semibold text-gray-600 dark:text-slate-400">Today's IPT Ship Plan</td>
+                            ${currentSlots.map((slot, i) => `<td contenteditable="true" class="text-gray-600 dark:text-slate-400" id="top_plan_${i}"></td>`).join('')}
+                        </tr>
+                        <tr class="bg-gray-50 dark:bg-slate-800/50 border-t border-black dark:border-slate-700">
+                            <td class="sticky-col bg-gray-50 dark:bg-slate-800 font-semibold text-gray-600 dark:text-slate-400">New Workable</td>
+                            ${currentSlots.map((slot, i) => `<td contenteditable="true" class="text-gray-600 dark:text-slate-400" id="top_workable_${i}"></td>`).join('')}
+                        </tr>
+                        <tr class="bg-gray-50 dark:bg-slate-800/50">
+                            <td class="sticky-col bg-gray-50 dark:bg-slate-800 font-semibold text-gray-600 dark:text-slate-400">New Workable - Multis</td>
+                            ${currentSlots.map((slot, i) => `<td contenteditable="true" class="text-gray-600 dark:text-slate-400" id="top_workable_multis_${i}"></td>`).join('')}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-300 dark:border-slate-700 mb-10">
+                <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Üst Tablo Genel Trend Grafiği</h3>
+                <div class="relative h-72 w-full">
+                    <canvas id="chart_top_summary"></canvas>
+                </div>
+            </div>`;
+
+            const createSection = (title, cat) => {
+                let hourRanges = [];
+                let numHours = (currentSlots.length - 1) / 4; 
+                for(let i=0; i<numHours; i++) {
+                    let startSlot = currentSlots[i*4];
+                    let endSlot = currentSlots[(i+1)*4];
+                    hourRanges.push(`${startSlot.replace(':', '.')} - ${endSlot.replace(':', '.')}`);
+                }
+
+                let hourlyHTML = hourRanges.map((range, i) => `
+                    <div class="bg-white dark:bg-slate-800 border-b border-r border-black dark:border-slate-700 flex flex-col justify-between">
+                        <div class="font-bold p-2 text-[13px] border-b border-black dark:border-slate-700 flex-grow flex items-center justify-center text-center">${range}</div>
+                        <div class="p-2 text-red-600 dark:text-red-400 font-bold text-center flex-grow flex items-center justify-center" id="hourly_${cat}_${i}">0</div>
+                    </div>
+                `).join('');
+
+                let hourlyGrid = `
+                    <div class="border-[3px] border-red-600 w-full xl:w-2/3 shadow-sm bg-[#facc15] dark:bg-amber-600">
+                        <div class="font-bold text-center p-2 text-black border-b border-black dark:border-slate-700">Total ${title} (Hr)</div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 bg-white dark:bg-slate-800" style="border-right: 1px solid black; border-bottom: 1px solid black;">
+                            ${hourlyHTML}
+                        </div>
+                    </div>
+                `;
+
+                let dailySummaryHTML = `
+                    <div class="border-[3px] border-red-600 w-full xl:w-1/3 shadow-sm bg-white dark:bg-slate-800">
+                        <div class="bg-[#facc15] dark:bg-amber-600 font-bold text-center border-b border-black dark:border-slate-700 p-2 text-black">Daily Summary</div>
+                        <table class="w-full text-sm summary-table">
+                            <tbody>
+                                <tr>
+                                    <td class="p-2 pl-4 font-semibold text-left">Total Target Units:</td>
+                                    <td class="p-2 text-center text-red-600 dark:text-red-400 font-bold w-24" id="summary_target_${cat}">0</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2 pl-4 font-semibold text-left">Avr Target Units (15 mins):</td>
+                                    <td class="p-2 text-center text-red-600 dark:text-red-400 font-bold w-24" id="summary_target_avr_${cat}">0</td>
+                                </tr>
+                                <tr class="bg-[#bbf7d0] dark:bg-emerald-950/60">
+                                    <td class="p-2 pl-4 font-semibold text-left">Total Ship Units:</td>
+                                    <td class="p-2 text-center text-red-600 dark:text-red-400 font-bold w-24" id="summary_actual_${cat}">0</td>
+                                </tr>
+                                <tr class="bg-[#93c5fd] dark:bg-blue-950/60">
+                                    <td class="p-2 pl-4 font-semibold text-left">Avr Ship Units (15 mins):</td>
+                                    <td class="p-2 text-center text-red-600 dark:text-red-400 font-bold w-24" id="summary_avr_actual_${cat}">0</td>
+                                </tr>
+                                <tr class="bg-[#facc15] dark:bg-amber-900/40">
+                                    <td class="p-2 pl-4 font-semibold text-left">Avr Ship Units (hr):</td>
+                                    <td class="p-2 text-center text-red-600 dark:text-red-400 font-bold w-24" id="summary_avr_hr_actual_${cat}">0</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                return `
+                <div class="mb-14">
+                    <h2 class="text-xl font-bold bg-slate-800 dark:bg-slate-700 text-white py-2 px-4 rounded-t-lg mb-4 tracking-wide shadow-md uppercase">
+                        ${title}
+                    </h2>
+                    
+                    <div class="flex flex-col xl:flex-row gap-6 mb-6 items-start">
+                        ${hourlyGrid}
+                        ${dailySummaryHTML}
+                    </div>
+
+                    <div class="table-container border-[3px] border-black dark:border-slate-600 shadow-sm mb-4 bg-white dark:bg-slate-800 rounded">
+                        <table class="w-full whitespace-nowrap">
+                            <thead>
+                                <tr class="bg-[#bfdbfe] dark:bg-blue-950 text-black dark:text-blue-200">
+                                    <th class="sticky-col bg-[#bfdbfe] dark:bg-blue-950 border-b-[3px] border-black dark:border-slate-600">DATE</th>
+                                    ${currentSlots.map(slot => `<th class="text-red-600 dark:text-red-400 border-b-[3px] border-black dark:border-slate-600">${slot.replace(':', '.')}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="sticky-col bg-white dark:bg-slate-800 font-semibold text-red-600 dark:text-red-400 w-48 text-left pl-4">Target Units / 15 mins</td>
+                                    ${currentSlots.map((slot, i) => {
+                                        let defaultT = 0;
+                                        if (currentShiftStart === '23:00' || currentShiftStart === '19:00') {
+                                            let midIndex = currentSlots.indexOf("00:00");
+                                            if (i <= midIndex) defaultT = defaultTargetsDay1[cat] || 0;
+                                            else defaultT = defaultTargetsDay2[cat] || 0;
+                                        } else {
+                                            defaultT = defaultTargets[cat] || 0;
+                                        }
+                                        return `<td contenteditable="true" class="text-red-600 dark:text-red-400 font-bold" id="target15_${cat}_${i}">${i > 0 ? defaultT : '0'}</td>`;
+                                    }).join('')}
+                                </tr>
+                                <tr class="bg-[#dcfce7] dark:bg-emerald-950/40">
+                                    <td class="sticky-col bg-[#dcfce7] dark:bg-emerald-950 font-semibold text-left pl-4 border-t-[3px] border-black dark:border-slate-600">${cat === 'fracs' ? 'FRACS Units / 15 mins' : 'Ship Units / 15 mins'}</td>
+                                    ${currentSlots.map((slot, i) => `<td class="border-t-[3px] border-black dark:border-slate-600 font-bold" id="actual_${cat}_${i}">${i === 0 ? '0' : ''}</td>`).join('')}
+                                </tr>
+                                <tr class="bg-[#bfdbfe] dark:bg-blue-950/40">
+                                    <td class="sticky-col bg-[#bfdbfe] dark:bg-blue-950 font-semibold text-left pl-4 border-b-[3px] border-black dark:border-slate-600">Ship Units / Avr / 15 mins</td>
+                                    ${currentSlots.map((slot, i) => `<td class="border-b-[3px] border-black dark:border-slate-600" id="avr15_${cat}_${i}">0</td>`).join('')}
+                                </tr>
+                                <tr>
+                                    <td class="sticky-col bg-white dark:bg-slate-800 font-bold text-center">BREAK</td>
+                                    ${currentSlots.map((slot, i) => `<td class="cursor-pointer font-bold hover:bg-gray-100 dark:hover:bg-slate-700 break-cell-${i}" onclick="toggleBreak(${i})"></td>`).join('')}
+                                </tr>
+                                <tr class="bg-[#facc15] dark:bg-amber-900/40">
+                                    <td class="sticky-col bg-[#facc15] dark:bg-amber-900 font-bold text-left pl-4 border-t-[3px] border-black dark:border-slate-600">Ship Units / Avr / Hr</td>
+                                    ${currentSlots.map((slot, i) => `<td class="border-t-[3px] border-black dark:border-slate-600 font-bold" id="avrHr_${cat}_${i}">0</td>`).join('')}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-300 dark:border-slate-700 mb-8">
+                        <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">15 Dakikalık Hedef vs Gerçekleşen Grafiği (${title})</h3>
+                        <div class="relative h-64 w-full">
+                            <canvas id="chart_${cat}"></canvas>
+                        </div>
+                    </div>
+                </div>`;
+            };
+
+            html += createSection("TOTAL UNITS", "total");
+            html += createSection("MULTIS", "multis");
+            html += createSection("SINGLES", "singles");
+            html += createSection("FRACS UNITS", "fracs");
+
+            container.innerHTML = html;
+
+            initCharts();
+
+            if (autoRecalculate) {
+                recalculateAll();
+            }
+        }
+
+        function initCharts() {
+            const colors = getChartColors();
+
+            const topCtx = document.getElementById('chart_top_summary').getContext('2d');
+            if (chartInstances['top_summary']) chartInstances['top_summary'].destroy();
+
+            chartInstances['top_summary'] = new Chart(topCtx, {
+                type: 'line',
+                data: {
+                    labels: currentSlots.map(s => s.replace(':', '.')),
+                    datasets: [
+                        { label: 'Ship Units (So Far)', data: getTopValues('total'), borderColor: '#2563eb', borderWidth: 2, tension: 0.2, pointRadius: 2 },
+                        { label: 'Multis', data: getTopValues('multis'), borderColor: '#16a34a', borderWidth: 2, tension: 0.2, pointRadius: 2 },
+                        { label: 'Singles', data: getTopValues('singles'), borderColor: '#d97706', borderWidth: 2, tension: 0.2, pointRadius: 2 },
+                        { label: 'incl. FRACS', data: getTopValues('fracs'), borderColor: '#9333ea', borderWidth: 2, tension: 0.2, pointRadius: 2, borderDash: [5, 5] },
+                        { label: 'Projected', data: getTopValues('projected'), borderColor: '#dc2626', borderWidth: 2, tension: 0.2, pointRadius: 2, borderDash: [2, 2] },
+                        { label: 'Plan', data: getTopValues('plan'), borderColor: '#64748b', borderWidth: 2, tension: 0.2, pointRadius: 2 },
+                        { label: 'New Workable', data: getTopValues('workable'), borderColor: '#0891b2', borderWidth: 2, tension: 0.2, pointRadius: 2 },
+                        { label: 'New Workable Multis', data: getTopValues('workable_multis'), borderColor: '#4d7c0f', borderWidth: 2, tension: 0.2, pointRadius: 2 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { 
+                        y: { beginAtZero: false, grid: { color: colors.gridColor }, ticks: { color: colors.textColor } }, 
+                        x: { grid: { display: false }, ticks: { color: colors.textColor } } 
+                    },
+                    plugins: { legend: { position: 'bottom', labels: { color: colors.textColor } } }
+                },
+                plugins: [breakHighlightPlugin]
+            });
+
+            ['total', 'multis', 'singles', 'fracs'].forEach(cat => {
+                const ctx = document.getElementById(`chart_${cat}`).getContext('2d');
+                if (chartInstances[cat]) chartInstances[cat].destroy();
+
+                chartInstances[cat] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: currentSlots.map(s => s.replace(':', '.')),
+                        datasets: [
+                            {
+                                label: 'Gerçekleşen (Actual / 15dk)',
+                                data: currentSlots.map((_, i) => {
+                                    let val = parseInt(document.getElementById(`actual_${cat}_${i}`)?.innerText);
+                                    return isNaN(val) ? 0 : val;
+                                }),
+                                borderColor: cat === 'total' ? '#2563eb' : (cat === 'multis' ? '#16a34a' : (cat === 'singles' ? '#d97706' : '#9333ea')),
+                                backgroundColor: cat === 'total' ? 'rgba(37, 99, 235, 0.1)' : (cat === 'multis' ? 'rgba(22, 163, 74, 0.1)' : (cat === 'singles' ? 'rgba(217, 119, 6, 0.1)' : 'rgba(147, 51, 234, 0.1)')),
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.2,
+                                pointRadius: 3
+                            },
+                            {
+                                label: 'Hedef (Target / 15dk)',
+                                data: currentSlots.map((_, i) => {
+                                    let val = parseInt(document.getElementById(`target15_${cat}_${i}`)?.innerText);
+                                    return isNaN(val) ? 0 : val;
+                                }),
+                                borderColor: '#dc2626',
+                                borderDash: [4, 4],
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0,
+                                pointRadius: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { 
+                            y: { beginAtZero: true, grid: { color: colors.gridColor }, ticks: { color: colors.textColor } }, 
+                            x: { grid: { display: false }, ticks: { color: colors.textColor } } 
+                        },
+                        plugins: { legend: { position: 'bottom', labels: { color: colors.textColor } } }
+                    },
+                    plugins: [breakHighlightPlugin]
+                });
+            });
+        }
+
+        function getTopValues(cat) {
+            return currentSlots.map((_, i) => {
+                let val = parseInt(document.getElementById(`top_${cat}_${i}`)?.innerText);
+                return isNaN(val) ? null : val;
+            });
+        }
+
+        function updateCharts() {
+            if (chartInstances['top_summary']) {
+                chartInstances['top_summary'].data.labels = currentSlots.map(s => s.replace(':', '.'));
+                chartInstances['top_summary'].data.datasets[0].data = getTopValues('total');
+                chartInstances['top_summary'].data.datasets[1].data = getTopValues('multis');
+                chartInstances['top_summary'].data.datasets[2].data = getTopValues('singles');
+                chartInstances['top_summary'].data.datasets[3].data = getTopValues('fracs');
+                chartInstances['top_summary'].data.datasets[4].data = getTopValues('projected');
+                chartInstances['top_summary'].data.datasets[5].data = getTopValues('plan');
+                chartInstances['top_summary'].data.datasets[6].data = getTopValues('workable');
+                chartInstances['top_summary'].data.datasets[7].data = getTopValues('workable_multis');
+                chartInstances['top_summary'].update();
+            }
+
+            ['total', 'multis', 'singles', 'fracs'].forEach(cat => {
+                if (chartInstances[cat]) {
+                    chartInstances[cat].data.labels = currentSlots.map(s => s.replace(':', '.'));
+                    chartInstances[cat].data.datasets[0].data = currentSlots.map((_, i) => {
+                        let val = parseInt(document.getElementById(`actual_${cat}_${i}`)?.innerText);
+                        return isNaN(val) ? 0 : val;
+                    });
+                    chartInstances[cat].data.datasets[1].data = currentSlots.map((_, i) => {
+                        let val = parseInt(document.getElementById(`target15_${cat}_${i}`)?.innerText);
+                        return isNaN(val) ? 0 : val;
+                    });
+                    chartInstances[cat].update();
+                }
+            });
+        }
+
+        document.addEventListener('input', function(e) {
+            if (e.target.hasAttribute('contenteditable')) {
+                if (e.target.id === 'top_total_0') {
+                    calculateDynamicTargets();
+                } else if ((currentShiftStart === '23:00' || currentShiftStart === '19:00') && e.target.id === 'top_total_' + currentSlots.indexOf("00:00")) {
+                    calculateDynamicTargets();
+                } else {
+                    recalculateAll();
+                }
+            }
+        });
+
+        function recalculateAll() {
+            ['total', 'multis', 'singles', 'fracs', 'projected', 'plan', 'workable', 'workable_multis'].forEach(cat => {
+                let prevVal = -1;
+                for (let i = 0; i < currentSlots.length; i++) {
+                    let cell = document.getElementById(`top_${cat}_${i}`);
+                    if (!cell) continue;
+
+                    let isDay2Start = (currentShiftStart === '23:00' || currentShiftStart === '19:00') && currentSlots[i] === '00:15';
+                    if (isDay2Start && cat !== 'plan') {
+                        prevVal = -1; 
+                    }
+
+                    let valStr = cell.innerText.trim();
+                    if (valStr !== "") {
+                        let val = parseInt(valStr);
+                        if (!isNaN(val)) {
+                            if (prevVal !== -1 && val < prevVal && cat !== 'workable' && cat !== 'workable_multis' && cat !== 'projected') {
+                                cell.classList.add('input-error');
+                                cell.title = "Hata: Kümülatif değer önceki saatten küçük olamaz!";
+                            } else {
+                                cell.classList.remove('input-error');
+                                cell.title = "";
+                                prevVal = val;
+                            }
+                        }
+                    } else {
+                        cell.classList.remove('input-error');
+                        cell.title = "";
+                    }
+                }
+            });
+
+            // Standard Top 3 Actual Calculation
+            ['total', 'multis', 'singles'].forEach(cat => {
+                let cell0 = document.getElementById(`actual_${cat}_0`);
+                if (cell0) cell0.innerText = "0"; 
+                
+                for (let i = 1; i < currentSlots.length; i++) {
+                    let currStr = document.getElementById(`top_${cat}_${i}`)?.innerText.trim();
+                    let prevStr = document.getElementById(`top_${cat}_${i-1}`)?.innerText.trim();
+                    let actualCell = document.getElementById(`actual_${cat}_${i}`);
+                    
+                    let isDay2Start = (currentShiftStart === '23:00' || currentShiftStart === '19:00') && currentSlots[i] === '00:15';
+                    let prevValToUse = isDay2Start ? 0 : (parseInt(prevStr) || 0);
+
+                    if (actualCell) {
+                        if (currStr !== "" && currStr !== undefined && (isDay2Start || (prevStr !== "" && prevStr !== undefined))) {
+                            let diff = (parseInt(currStr) || 0) - prevValToUse;
+                            actualCell.innerText = diff < 0 ? 0 : diff;
+                        } else {
+                            actualCell.innerText = "";
+                        }
+                    }
+                }
+            });
+
+            // FRACS Actual Calculation
+            let fracsCell0 = document.getElementById(`actual_fracs_0`);
+            if (fracsCell0) fracsCell0.innerText = "0"; 
+            
+            for (let i = 1; i < currentSlots.length; i++) {
+                let currFracsStr = document.getElementById(`top_fracs_${i}`)?.innerText.trim();
+                let prevFracsStr = document.getElementById(`top_fracs_${i-1}`)?.innerText.trim();
+                
+                let currTotalStr = document.getElementById(`top_total_${i}`)?.innerText.trim();
+                let prevTotalStr = document.getElementById(`top_total_${i-1}`)?.innerText.trim();
+                
+                let actualFracsCell = document.getElementById(`actual_fracs_${i}`);
+
+                let isDay2Start = (currentShiftStart === '23:00' || currentShiftStart === '19:00') && currentSlots[i] === '00:15';
+                let prevFracsToUse = isDay2Start ? 0 : (parseInt(prevFracsStr) || 0);
+                let prevTotalToUse = isDay2Start ? 0 : (parseInt(prevTotalStr) || 0);
+
+                if (actualFracsCell) {
+                    let isValidFracs = currFracsStr !== "" && currFracsStr !== undefined && (isDay2Start || (prevFracsStr !== "" && prevFracsStr !== undefined));
+                    let isValidTotal = currTotalStr !== "" && currTotalStr !== undefined && (isDay2Start || (prevTotalStr !== "" && prevTotalStr !== undefined));
+
+                    if (isValidFracs && isValidTotal) {
+                        let diffFracsIncl = (parseInt(currFracsStr) || 0) - prevFracsToUse;
+                        let diffTotal = (parseInt(currTotalStr) || 0) - prevTotalToUse;
+                        
+                        let fracs15Min = diffFracsIncl - diffTotal;
+                        actualFracsCell.innerText = fracs15Min < 0 ? 0 : fracs15Min;
+                    } else {
+                        actualFracsCell.innerText = "";
+                    }
+                }
+            }
+
+            let totalActualSum = 0;
+            let totalTargetSum = 0;
+
+            ['total', 'multis', 'singles', 'fracs'].forEach(cat => {
+                let sumTarget = 0;
+                let sumActual = 0;
+                let validSlots = 0;
+                
+                for (let i = 0; i < currentSlots.length; i++) {
+                    let targetVal = parseInt(document.getElementById(`target15_${cat}_${i}`)?.innerText) || 0;
+                    let actualStr = document.getElementById(`actual_${cat}_${i}`)?.innerText;
+                    let actualVal = (actualStr === "" || actualStr === undefined) ? 0 : parseInt(actualStr);
+                    
+                    let breakCells = document.querySelectorAll(`.break-cell-${i}`);
+                    let isBreak = breakCells.length > 0 && breakCells[0].innerText.trim() === 'X';
+                    
+                    if (i === 0) {
+                        if (document.getElementById(`avr15_${cat}_${i}`)) document.getElementById(`avr15_${cat}_${i}`).innerText = 0;
+                        if (document.getElementById(`avrHr_${cat}_${i}`)) document.getElementById(`avrHr_${cat}_${i}`).innerText = 0;
+                    } else {
+                        sumTarget += targetVal;
+                        sumActual += actualVal;
+                        
+                        if (!isBreak && actualStr !== "" && actualStr !== undefined) {
+                            validSlots++;
+                        }
+                        
+                        let avr15 = validSlots > 0 ? (sumActual / validSlots) : 0;
+                        let avrHr = avr15 * 4;
+                        
+                        if (document.getElementById(`avr15_${cat}_${i}`)) document.getElementById(`avr15_${cat}_${i}`).innerText = Math.round(avr15);
+                        if (document.getElementById(`avrHr_${cat}_${i}`)) document.getElementById(`avrHr_${cat}_${i}`).innerText = Math.round(avrHr);
+                    }
+                }
+
+                if (cat === 'total') {
+                    totalActualSum = sumActual;
+                    totalTargetSum = sumTarget;
+                }
+
+                if (document.getElementById(`summary_target_${cat}`)) document.getElementById(`summary_target_${cat}`).innerText = sumTarget;
+                
+                if (document.getElementById(`summary_target_avr_${cat}`)) {
+                    if (currentShiftStart === '23:00' || currentShiftStart === '19:00') {
+                        document.getElementById(`summary_target_avr_${cat}`).innerHTML = `<span style="font-size: 10px">${defaultTargetsDay1[cat] || 0} / ${defaultTargetsDay2[cat] || 0}</span>`;
+                    } else {
+                        document.getElementById(`summary_target_avr_${cat}`).innerText = defaultTargets[cat] || 0;
+                    }
+                }
+                
+                if (document.getElementById(`summary_actual_${cat}`)) document.getElementById(`summary_actual_${cat}`).innerText = sumActual;
+                
+                let finalAvr15 = validSlots > 0 ? (sumActual / validSlots) : 0;
+                if (document.getElementById(`summary_avr_actual_${cat}`)) document.getElementById(`summary_avr_actual_${cat}`).innerText = Math.round(finalAvr15);
+                if (document.getElementById(`summary_avr_hr_actual_${cat}`)) document.getElementById(`summary_avr_hr_actual_${cat}`).innerText = Math.round(finalAvr15 * 4);
+
+                let numHours = (currentSlots.length - 1) / 4;
+                for (let h = 0; h < numHours; h++) {
+                    let hourlySum = 0;
+                    for (let j = 1; j <= 4; j++) {
+                        let slotIndex = (h * 4) + j;
+                        if (slotIndex < currentSlots.length) {
+                            let aStr = document.getElementById(`actual_${cat}_${slotIndex}`)?.innerText;
+                            if (aStr !== "" && aStr !== undefined) {
+                                hourlySum += parseInt(aStr) || 0;
+                            }
+                        }
+                    }
+                    let el = document.getElementById(`hourly_${cat}_${h}`);
+                    if (el) el.innerText = hourlySum;
+                }
+            });
+
+            updateOEE(totalActualSum, totalTargetSum);
+            updateCharts();
+            if (!isInitializing) saveToStorage();
+        }
+
+        function updateOEE(actual, target) {
+            let oeeEl = document.getElementById('oeeScoreDisplay');
+            let statusEl = document.getElementById('oeeStatusText');
+            if (!oeeEl || !statusEl) return;
+
+            if (target === 0) {
+                oeeEl.innerText = "%0.0";
+                statusEl.innerText = "Hedef Girilmedi";
+                return;
+            }
+
+            let score = (actual / target) * 100;
+            oeeEl.innerText = `%${score.toFixed(1)}`;
+
+            if (score >= 100) {
+                oeeEl.className = "text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1";
+                statusEl.innerText = "Hedefin Üzerinde 🚀";
+            } else if (score >= 85) {
+                oeeEl.className = "text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-1";
+                statusEl.innerText = "Normal Seyirde 👍";
+            } else {
+                oeeEl.className = "text-3xl font-extrabold text-rose-600 dark:text-rose-400 mt-1";
+                statusEl.innerText = "Hedefin Gerisinde ⚠️";
+            }
+        }
+
+        function exportToExcel() {
+            saveCurrentShiftToStore();
+            const shiftKey = `${currentShiftStart}-${currentShiftEnd}`;
+            const data = shiftDataStore[shiftKey];
+            if (!data) {
+                alert("Dışa aktarılacak veri bulunamadı!");
+                return;
+            }
+
+            let exportArray = [];
+            exportArray.push(["Vardiya", `${currentShiftStart} - ${currentShiftEnd}`]);
+            exportArray.push([]);
+            exportArray.push(["Metrik", ...currentSlots]);
+
+            ['total', 'multis', 'singles', 'fracs', 'projected', 'plan', 'workable', 'workable_multis'].forEach(cat => {
+                let row = [`Top ${cat.toUpperCase()}`];
+                currentSlots.forEach((_, i) => {
+                    row.push(data.cells[`top_${cat}_${i}`] || "");
+                });
+                exportArray.push(row);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(exportArray);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Vardiya Raporu");
+            XLSX.writeFile(wb, `Packing_Performance_${currentShiftStart.replace(':', '')}-${currentShiftEnd.replace(':', '')}.xlsx`);
+        }
+
+        async function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const dashboard = document.getElementById('dashboardArea');
+            
+            const canvas = await html2canvas(dashboard, { scale: 1.5, backgroundColor: '#ffffff' });
+            const imgData = canvas.toDataURL('image/png');
+
+            const pdf = new jsPDF('landscape', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+            pdf.setFontSize(16);
+            pdf.text(`Packing Performance Dashboard - Vardiya: ${currentShiftStart} - ${currentShiftEnd}`, 14, 15);
+            pdf.addImage(imgData, 'PNG', 10, 22, pdfWidth - 20, pdfHeight > 170 ? 170 : pdfHeight);
+            pdf.save(`Packing_Performance_${currentShiftStart}-${currentShiftEnd}.pdf`);
+        }
+
+        function saveCurrentShiftToStore() {
+            if (!currentShiftStart || !currentShiftEnd || currentSlots.length === 0) return;
+            const shiftKey = `${currentShiftStart}-${currentShiftEnd}`;
+            const shiftData = { cells: {} };
+            
+            ['total', 'multis', 'singles', 'fracs'].forEach(cat => {
+                for(let i=0; i<currentSlots.length; i++) {
+                    let actualEl = document.getElementById(`actual_${cat}_${i}`);
+                    let topEl = document.getElementById(`top_${cat}_${i}`);
+                    let target15El = document.getElementById(`target15_${cat}_${i}`);
+                    if(actualEl) shiftData.cells[`actual_${cat}_${i}`] = actualEl.innerText;
+                    if(topEl) shiftData.cells[`top_${cat}_${i}`] = topEl.innerText;
+                    if(target15El) shiftData.cells[`target15_${cat}_${i}`] = target15El.innerText;
+                }
+            });
+
+            ['projected', 'plan', 'workable', 'workable_multis'].forEach(cat => {
+                for(let i=0; i<currentSlots.length; i++) {
+                    let topEl = document.getElementById(`top_${cat}_${i}`);
+                    if(topEl) shiftData.cells[`top_${cat}_${i}`] = topEl.innerText;
+                }
+            });
+
+            for(let i=0; i<currentSlots.length; i++) {
+                let breakEl = document.querySelector(`.break-cell-${i}`);
+                if (breakEl) {
+                    shiftData.cells[`break_${i}`] = breakEl.innerText.trim() === 'X';
+                }
+            }
+
+            shiftDataStore[shiftKey] = shiftData;
+        }
+
+        function loadShiftFromStore(shiftKey) {
+            const data = shiftDataStore[shiftKey];
+            if (!data) return;
+
+            isInitializing = true;
+            for (let key in data.cells) {
+                if (key.startsWith('break_')) {
+                    let i = key.split('_')[1];
+                    let isBreak = data.cells[key];
+                    let cells = document.querySelectorAll(`.break-cell-${i}`);
+                    cells.forEach(cell => {
+                        if (isBreak) {
+                            cell.innerText = 'X';
+                            cell.classList.add('bg-[#fef08a]', 'text-black');
+                        } else {
+                            cell.innerText = '';
+                            cell.classList.remove('bg-[#fef08a]', 'text-black');
+                        }
+                    });
+                } else {
+                    let el = document.getElementById(key);
+                    if (el) {
+                        el.innerText = data.cells[key] || "";
+                    }
+                }
+            }
+            isInitializing = false;
+            recalculateAll();
+            calculateDynamicTargets();
+        }
+
+        function saveToStorage() {
+            saveCurrentShiftToStore();
+            const storageObj = {
+                currentShift: `${currentShiftStart}-${currentShiftEnd}`,
+                stores: shiftDataStore,
+                dynamicTargets: {
+                    iptPlan: document.getElementById('iptTargetInput')?.value || "",
+                    totalBreak: document.getElementById('totalBreakInput')?.value || "180",
+                    takenBreak: document.getElementById('takenBreakInput')?.value || "0"
+                },
+                dynamicTargetsDual: {
+                    iptPlan1: document.getElementById('iptTargetInput_day1')?.value || "",
+                    totalBreak1: document.getElementById('totalBreakInput_day1')?.value || "45",
+                    takenBreak1: document.getElementById('takenBreakInput_day1')?.value || "0",
+                    iptPlan2: document.getElementById('iptTargetInput_day2')?.value || "",
+                    totalBreak2: document.getElementById('totalBreakInput_day2')?.value || "45",
+                    takenBreak2: document.getElementById('takenBreakInput_day2')?.value || "0"
+                }
+            };
+            localStorage.setItem('packingDashboardMultiShiftDataPro', JSON.stringify(storageObj));
+        }
+
+        function loadFromStorage() {
+            const json = localStorage.getItem('packingDashboardMultiShiftDataPro');
+            if (!json) return false;
+            
+            try {
+                const data = JSON.parse(json);
+                shiftDataStore = data.stores || {};
+
+                if (data.dynamicTargets) {
+                    if (document.getElementById('iptTargetInput')) document.getElementById('iptTargetInput').value = data.dynamicTargets.iptPlan || "";
+                    if (document.getElementById('totalBreakInput')) document.getElementById('totalBreakInput').value = data.dynamicTargets.totalBreak || "180";
+                    if (document.getElementById('takenBreakInput')) document.getElementById('takenBreakInput').value = data.dynamicTargets.takenBreak || "0";
+                }
+                if (data.dynamicTargetsDual) {
+                    if (document.getElementById('iptTargetInput_day1')) document.getElementById('iptTargetInput_day1').value = data.dynamicTargetsDual.iptPlan1 || "";
+                    if (document.getElementById('totalBreakInput_day1')) document.getElementById('totalBreakInput_day1').value = data.dynamicTargetsDual.totalBreak1 || "45";
+                    if (document.getElementById('takenBreakInput_day1')) document.getElementById('takenBreakInput_day1').value = data.dynamicTargetsDual.takenBreak1 || "0";
+                    if (document.getElementById('iptTargetInput_day2')) document.getElementById('iptTargetInput_day2').value = data.dynamicTargetsDual.iptPlan2 || "";
+                    if (document.getElementById('totalBreakInput_day2')) document.getElementById('totalBreakInput_day2').value = data.dynamicTargetsDual.totalBreak2 || "45";
+                    if (document.getElementById('takenBreakInput_day2')) document.getElementById('takenBreakInput_day2').value = data.dynamicTargetsDual.takenBreak2 || "0";
+                }
+
+                if (data.currentShift) {
+                    const [start, end] = data.currentShift.split('-');
+                    setShift(start, end, true);
+                    return true;
+                }
+                return false;
+            } catch(e) {
+                return false;
+            }
+        }
+
+        function clearStorage() {
+            if (confirm("Tarayıcıya kaydedilmiş tüm vardiya verilerini silmek istediğinize emin misiniz?")) {
+                localStorage.removeItem('packingDashboardMultiShiftDataPro');
+                location.reload(); 
+            }
+        }
+
+        function processCSV() {
+            const fileInput = document.getElementById('csvFileInput');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const data = results.data;
+                    const headers = results.meta.fields || [];
+                    const timeData = {};
+
+                    headers.forEach(th => {
+                        const match = th.match(/T?(\d{2})[:\.](\d{2})/);
+                        if (match) {
+                            const timeStr = `${match[1]}:${match[2]}`;
+                            if (!timeData[timeStr]) {
+                                timeData[timeStr] = { hasData: false };
+                            }
+                            
+                            data.forEach(row => {
+                                let metricName = "";
+                                for (let key in row) {
+                                    if (key.toLowerCase().includes("metric") || key.toLowerCase().includes("fc")) {
+                                        metricName = row[key];
+                                        break;
+                                    }
+                                }
+                                if (!metricName) metricName = row[headers[0]];
+                                
+                                let value = row[th];
+                                
+                                if (value !== undefined && value !== null && value.toString().trim() !== "") {
+                                    timeData[timeStr].hasData = true;
+                                    let numValue = parseInt(value.toString().replace(/,/g, '').trim());
+                                    if (isNaN(numValue)) numValue = 0;
+                                    
+                                    if (metricName) {
+                                        let m = metricName.toLowerCase();
+                                        if (m.includes("new workable - multis")) {
+                                            timeData[timeStr].workable_multis = numValue;
+                                        } else if (m.includes("new workable")) {
+                                            timeData[timeStr].workable = numValue;
+                                        } else if (m.includes("shipments so far - multis")) {
+                                            timeData[timeStr].multis = numValue;
+                                        } else if (m.includes("shipments so far incl") || m.includes("fracs")) {
+                                            timeData[timeStr].fracs = numValue;
+                                        } else if (m.includes("projected")) {
+                                            timeData[timeStr].projected = numValue;
+                                        } else if (m.includes("plan")) {
+                                            timeData[timeStr].plan = numValue;
+                                        } else if (m.includes("singles")) {
+                                            timeData[timeStr].singles = numValue;
+                                        } else if (m.includes("shipments so far") || m.includes("ship units")) {
+                                            timeData[timeStr].total = numValue;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    if (currentSlots.length > 0) {
+                        for (let i = 0; i < currentSlots.length; i++) {
+                            const time = currentSlots[i];
+                            if (timeData[time] && timeData[time].hasData) {
+                                const td = timeData[time];
+                                
+                                let totalVal = td.total !== undefined ? td.total : "";
+                                let multisVal = td.multis !== undefined ? td.multis : "";
+                                let singlesVal = td.singles !== undefined ? td.singles : 
+                                    ((td.total !== undefined && td.multis !== undefined) ? (td.total - td.multis) : "");
+
+                                if (document.getElementById(`top_total_${i}`)) document.getElementById(`top_total_${i}`).innerText = totalVal;
+                                if (document.getElementById(`top_multis_${i}`)) document.getElementById(`top_multis_${i}`).innerText = multisVal;
+                                if (document.getElementById(`top_singles_${i}`)) document.getElementById(`top_singles_${i}`).innerText = singlesVal;
+                                if (document.getElementById(`top_fracs_${i}`)) document.getElementById(`top_fracs_${i}`).innerText = td.fracs !== undefined ? td.fracs : "";
+                                if (document.getElementById(`top_projected_${i}`)) document.getElementById(`top_projected_${i}`).innerText = td.projected !== undefined ? td.projected : "";
+                                if (document.getElementById(`top_plan_${i}`)) document.getElementById(`top_plan_${i}`).innerText = td.plan !== undefined ? td.plan : "";
+                                if (document.getElementById(`top_workable_${i}`)) document.getElementById(`top_workable_${i}`).innerText = td.workable !== undefined ? td.workable : "";
+                                if (document.getElementById(`top_workable_multis_${i}`)) document.getElementById(`top_workable_multis_${i}`).innerText = td.workable_multis !== undefined ? td.workable_multis : "";
+                            }
+                        }
+                        recalculateAll(); 
+                        calculateDynamicTargets(); 
+                        alert("CSV başarıyla yüklendi ve tüm hedefler güncellendi!");
+                    } else {
+                        alert("Lütfen önce bir vardiya seçin!");
+                    }
+                    fileInput.value = "";
+                }
+            });
+        }
+        
+        window.onload = () => {
+            initDarkMode();
+            if (!loadFromStorage()) {
+                setShift('07:00', '15:00');
+            }
+        }
+    </script>
+</body>
+</html>

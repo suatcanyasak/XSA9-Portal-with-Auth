@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="tr" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XSA9 Lagrange Management & PDF Birleştirici</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- html2pdf.js Kütüphanesi -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- PDF-Lib Kütüphanesi -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .table-input::-webkit-outer-spin-button, .table-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .table-input { -moz-appearance: textfield; }
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .selected-active-cell {
+            outline: 3px solid #ef4444 !important;
+            outline-offset: -3px;
+            position: relative;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 antialiased p-4 md:p-8 transition-colors duration-200">
+
+    <div class="max-w-7xl mx-auto space-y-8">
+        
+        <!-- Üst Başlık ve Mod Değiştirici -->
+        <header class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-200 dark:shadow-none">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800 dark:text-white">XSA9 Lagrange Management</h1>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm">Otomatik Labor Dağıtımı & PDF Araçları</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <div class="text-xs bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 px-3 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800/50 font-medium hidden md:block">
+                    💡 Kapasite veya sonuç hücresine tıkla, ardından tablolardan birine seçtir (`Ctrl+V` aktif)
+                </div>
+                <button onclick="toggleDarkMode()" class="flex items-center space-x-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border border-slate-200 dark:border-slate-600">
+                    <span id="mode-icon">🌙</span>
+                    <span id="mode-text">Koyu Mod</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- BÖLÜM 1: Günlük Kapasite ve Çarpan Tablosu -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 transition-colors">
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+                <div class="flex flex-wrap gap-4 items-end">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Başlangıç Tarihi</label>
+                        <input type="date" id="start-date" class="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-lg px-3 py-2 outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Gün Sayısı</label>
+                        <input type="number" id="day-count" value="21" min="1" max="60" class="w-24 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-lg px-3 py-2 outline-none focus:border-blue-500">
+                    </div>
+                    <button onclick="generateDailyTable()" class="bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white px-5 py-2 rounded-lg font-medium transition-all shadow-md">Tabloyu Yenile</button>
+                </div>
+                
+                <div class="bg-blue-50 dark:bg-blue-950/40 px-4 py-2 rounded-lg border border-blue-100 dark:border-blue-900/50 flex items-center space-x-3">
+                    <label class="text-sm font-semibold text-blue-800 dark:text-blue-300">Genel Katsayı (Çarpan):</label>
+                    <div class="flex items-center">
+                        <span class="text-blue-600 dark:text-blue-400 font-bold mr-1">*</span>
+                        <input type="number" id="global-multiplier" value="1.12" step="0.01" oninput="calculateDailyResults()" class="w-20 bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 rounded-md px-2 py-1 text-blue-900 dark:text-blue-200 font-bold outline-none text-center">
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                <table class="w-full text-sm text-left whitespace-nowrap">
+                    <thead id="daily-thead" class="bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700"></thead>
+                    <tbody id="daily-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- BÖLÜM 2: 4'LÜ LAGRANGE TABLOSU -->
+        <section>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center">
+                    <span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 w-8 h-8 rounded-lg flex items-center justify-center mr-3 font-bold border border-indigo-200 dark:border-indigo-800">4</span>
+                    Lagrange Operasyon Dağılımı ve Esnek Oran Paneli
+                </h2>
+                <div class="flex items-center space-x-4 text-xs text-slate-500 dark:text-slate-400">
+                    <span class="bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center space-x-2">
+                        <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                        <span>Mola Olmayan Slotlar</span>
+                    </span>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6" id="lagrange-grid"></div>
+        </section>
+
+        <!-- BÖLÜM 3: PDF Birleştirici Entegrasyonu -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 transition-colors">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center">
+                    <span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 w-8 h-8 rounded-lg flex items-center justify-center mr-3 font-bold border border-indigo-200 dark:border-indigo-800">PDF</span>
+                    PDF Birleştirme Aracı
+                </h2>
+                <span class="text-xs font-medium bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/50">Tarayıcıda Güvenli İşlem</span>
+            </div>
+
+            <!-- Upload Dropzone -->
+            <div id="dropzone" class="border-2 border-dashed border-indigo-300 dark:border-indigo-700 bg-slate-50 dark:bg-slate-900/50 hover:bg-indigo-50/50 dark:hover:bg-slate-900 transition-all rounded-2xl p-8 text-center cursor-pointer shadow-sm mb-6">
+                <input type="file" id="fileInput" multiple accept="application/pdf" class="hidden">
+                <div class="flex flex-col items-center justify-center space-y-3 pointer-events-none">
+                    <div class="w-16 h-16 bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center text-2xl">
+                        📄
+                    </div>
+                    <div>
+                        <p class="text-lg font-semibold text-slate-700 dark:text-slate-200">PDF dosyalarını buraya sürükleyin veya <span class="text-indigo-600 dark:text-indigo-400 underline">bilgisayardan seçin</span></p>
+                        <p class="text-sm text-slate-400 mt-1">Birden fazla dosya seçebilirsiniz</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File List Section -->
+            <div id="fileSection" class="hidden bg-slate-50 dark:bg-slate-900/50 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-800 dark:text-white text-lg">Seçilen Dosyalar (<span id="fileCount">0</span>)</h3>
+                    <button id="clearAllBtn" class="text-sm text-red-500 hover:text-red-700 font-medium transition-colors">Tümünü Temizle</button>
+                </div>
+                <ul id="fileList" class="space-y-3">
+                    <!-- Dinamik Dosya Listesi Buraya Gelecek -->
+                </ul>
+            </div>
+
+            <!-- Action Button -->
+            <div id="actionSection" class="hidden text-center">
+                <button id="mergeBtn" class="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center mx-auto space-x-2 text-lg">
+                    <span>PDF'leri Birleştir ve İndir</span>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </button>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loading" class="hidden text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-indigo-600 border-t-transparent"></div>
+                <p class="text-slate-600 dark:text-slate-400 font-medium mt-3">PDF'ler birleştiriliyor, lütfen bekleyin...</p>
+            </div>
+        </section>
+        
+    </div>
+
+    <script>
+        let selectedCell = null; 
+        let tableCapacities = [0, 0, 0, 0];
+        let tableDates = ["", "", "", ""]; 
+
+        let lagrangeTemplates = [
+            [
+                { t: "12.00 - 1.30", r: 1.35, dur: 1.5, multiPct: 0.6, pct: 8.660 },
+                { t: "1.30 - 1.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "1.45 - 3.30", r: 1.15, dur: 1.75, multiPct: 0.6, pct: 9.580 },
+                { t: "3.30 - 4.00", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "4.00 - 5.30", r: 1.2, dur: 1.5, multiPct: 0.6, pct: 5.080 },
+                { t: "5.30 - 5.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "5.45 - 7.00", r: 1.21, dur: 1.25, multiPct: 0.6, pct: 4.930 },
+                { t: "7.00 - 9.30", r: 0.7, dur: 2.5, multiPct: 0.6, pct: 8.280 },
+                { t: "9.30 - 9.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "9.45 - 11.30", r: 0.725, dur: 1.75, multiPct: 0.6, pct: 9.760 },
+                { t: "11.30 - 12.00", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "12.00 - 1.30", r: 0.725, dur: 1.5, multiPct: 0.6, pct: 5.950 },
+                { t: "1.30 - 1.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "1.45 - 3.00", r: 0.8, dur: 1.25, multiPct: 0.6, pct: 6.640 },
+                { t: "3.00 - 5.30", r: 0.8, dur: 2.5, multiPct: 0.6, pct: 10.450 },
+                { t: "5.30 - 5.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "5.45 - 7.30", r: 1, dur: 1.75, multiPct: 0.6, pct: 11.330 },
+                { t: "7.30 - 8.00", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "8.00 - 9.30", r: 1.35, dur: 1.5, multiPct: 0.6, pct: 8.300 },
+                { t: "9.30 - 9.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "9.45 - 11.00", r: 1.475, dur: 1.25, multiPct: 0.6, pct: 7.120 },
+                { t: "11.00 - 12.00", r: 0.975, dur: 1, multiPct: 0.6, pct: 3.920 }
+            ],
+            [
+                { t: "12.00 - 1.30", r: 1.35, dur: 1.5, multiPct: 0.6, pct: 8.660 },
+                { t: "1.30 - 1.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "1.45 - 3.30", r: 1.15, dur: 1.75, multiPct: 0.6, pct: 9.580 },
+                { t: "3.30 - 4.00", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "4.00 - 5.30", r: 1.175, dur: 1.5, multiPct: 0.6, pct: 5.080 },
+                { t: "5.30 - 5.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "5.45 - 7.00", r: 1.21, dur: 1.25, multiPct: 0.6, pct: 4.930 },
+                { t: "7.00 - 8.00", r: 0.7, dur: 1, multiPct: 0.6, pct: 3.500 },
+                { t: "8.00 - 9.15", r: 0.7, dur: 1.25, multiPct: 0.6, pct: 4.670 },
+                { t: "9.15 - 9.30", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "9.30 - 10.30", r: 0.725, dur: 1, multiPct: 0.6, pct: 4.900 },
+                { t: "10.30 - 12.00", r: 0.725, dur: 1.5, multiPct: 0.6, pct: 7.210 },
+                { t: "12.00 - 12.30", r: 0, dur: 0.3, multiPct: 0.6, pct: 0 },
+                { t: "12.30 - 2.15", r: 0.8, dur: 1.75, multiPct: 0.6, pct: 8.190 },
+                { t: "2.15 - 2.30", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "2.30 - 3.30", r: 0.8, dur: 1, multiPct: 0.6, pct: 4.090 },
+                { t: "3.30 - 5.15", r: 0.8, dur: 1.75, multiPct: 0.6, pct: 8.870 },
+                { t: "5.15 - 5.45", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "5.45 - 7.00", r: 1, dur: 1.25, multiPct: 0.6, pct: 7.910 },
+                { t: "7.00 - 8.00", r: 1, dur: 1, multiPct: 0.6, pct: 5.160 },
+                { t: "8.00 - 9.15", r: 1.35, dur: 1.25, multiPct: 0.6, pct: 6.070 },
+                { t: "9.15 - 9.30", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "9.30 - 11.45", r: 1.25, dur: 2.25, multiPct: 0.6, pct: 11.180 }
+            ],
+            [
+                { t: "12.15 - 2.15", r: 1.35, dur: 2, multiPct: 0.6, pct: 11.730 },
+                { t: "2.15 - 2.30", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "2.30 - 4.45", r: 1.2, dur: 2.25, multiPct: 0.6, pct: 9.600 },
+                { t: "4.45 - 5.15", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "5.15 - 7.00", r: 1.15, dur: 1.75, multiPct: 0.6, pct: 6.350 },
+                { t: "7.00 - 8.00", r: 0.7, dur: 1, multiPct: 0.6, pct: 3.500 },
+                { t: "8.00 - 9.15", r: 0.7, dur: 1.25, multiPct: 0.6, pct: 4.670 },
+                { t: "9.15 - 9.30", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "9.30 - 10.30", r: 0.7, dur: 1, multiPct: 0.6, pct: 4.900 },
+                { t: "10.30 - 12.00", r: 0.7, dur: 1.5, multiPct: 0.6, pct: 7.300 },
+                { t: "12.00 - 12.30", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "12.30 - 2.15", r: 0.775, dur: 1.75, multiPct: 0.6, pct: 8.600 },
+                { t: "2.15 - 2.30", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "2.30 - 3.30", r: 0.8, dur: 1, multiPct: 0.6, pct: 4.150 },
+                { t: "3.30 - 5.15", r: 0.8, dur: 1.75, multiPct: 0.6, pct: 8.880 },
+                { t: "5.15 - 5.45", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "5.45 - 7.00", r: 1, dur: 1.25, multiPct: 0.6, pct: 7.910 },
+                { t: "7.00 - 8.00", r: 1, dur: 1, multiPct: 0.6, pct: 5.160 },
+                { t: "8.00 - 9.15", r: 1.35, dur: 1.25, multiPct: 0.6, pct: 6.070 },
+                { t: "9.15 - 9.30", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "9.30 - 11.45", r: 1.25, dur: 2.25, multiPct: 0.6, pct: 11.180 }
+            ],
+            [
+                { t: "12.15 - 2.15", r: 1.35, dur: 2, multiPct: 0.6, pct: 11.730 },
+                { t: "2.15 - 2.30", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "2.30 - 4.45", r: 1.2, dur: 2.25, multiPct: 0.6, pct: 9.600 },
+                { t: "4.45 - 5.15", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "5.15 - 7.00", r: 1.15, dur: 1.75, multiPct: 0.6, pct: 6.350 },
+                { t: "7.00 - 9.30", r: 0.7, dur: 2.5, multiPct: 0.6, pct: 8.280 },
+                { t: "9.30 - 9.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "9.45 - 11.30", r: 0.73, dur: 1.75, multiPct: 0.6, pct: 9.760 },
+                { t: "11.30 - 12.00", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "12.00 - 1.30", r: 0.73, dur: 1.5, multiPct: 0.6, pct: 6.500 },
+                { t: "1.30 - 1.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "1.45 - 3.00", r: 0.8, dur: 1.25, multiPct: 0.6, pct: 6.650 },
+                { t: "3.00 - 5.30", r: 0.8, dur: 2.5, multiPct: 0.6, pct: 10.460 },
+                { t: "5.30 - 5.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "5.45 - 7.30", r: 1, dur: 1.75, multiPct: 0.6, pct: 11.330 },
+                { t: "7.30 - 8.00", r: 0, dur: 0.5, multiPct: 0.6, pct: 0 },
+                { t: "8.00 - 9.30", r: 1.35, dur: 1.5, multiPct: 0.6, pct: 8.300 },
+                { t: "9.30 - 9.45", r: 0, dur: 0.25, multiPct: 0.6, pct: 0 },
+                { t: "9.45 - 11.00", r: 1.4, dur: 1.25, multiPct: 0.6, pct: 7.120 },
+                { t: "11.00 - 12.00", r: 0.98, dur: 1, multiPct: 0.6, pct: 3.920 }
+            ]
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('start-date').valueAsDate = new Date();
+            generateDailyTable();
+            renderLagrangeTables();
+            initPdfMerger();
+        });
+        
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const modeIcon = document.getElementById('mode-icon');
+            const modeText = document.getElementById('mode-text');
+            
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                html.classList.add('light');
+                modeIcon.innerText = '🌙';
+                modeText.innerText = 'Koyu Mod';
+            } else {
+                html.classList.remove('light');
+                html.classList.add('dark');
+                modeIcon.innerText = '☀️';
+                modeText.innerText = 'Aydınlık Mod';
+            }
+        }
+
+        function generateDailyTable() {
+            const days = parseInt(document.getElementById('day-count').value) || 21;
+            const startDateInput = document.getElementById('start-date').value;
+            let startDate = startDateInput ? new Date(startDateInput) : new Date();
+            
+            let theadHtml = `<tr><th class="p-3 border-r border-slate-200 dark:border-slate-700 w-36 bg-slate-100 dark:bg-slate-700 sticky left-0 z-10">Metrik</th>`;
+            let inputHtml = `<tr><td class="p-3 border-r border-slate-200 dark:border-slate-700 font-medium bg-white dark:bg-slate-800 sticky left-0 z-10">Kapasite</td>`;
+            let resultHtml = `<tr><td class="p-3 border-r border-blue-100 dark:border-blue-900 font-bold bg-[#0ea5e9] text-white sticky left-0 z-10" id="multiplier-label">*1,12</td>`;
+
+            for (let i = 0; i < days; i++) {
+                let d = new Date(startDate);
+                d.setDate(d.getDate() + i);
+                let dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                let cleanDate = dateStr.replace(' ', '-');
+                
+                theadHtml += `<th class="p-3 text-center min-w-[100px] bg-orange-100/60 dark:bg-orange-950/40 text-slate-700 dark:text-orange-200 border-r border-slate-200 dark:border-slate-700" data-date-index="${i}">${cleanDate}</th>`;
+                
+                inputHtml += `<td class="p-2 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors" id="cap-cell-${i}" onclick="handleCapacityClick(${i}, '${cleanDate}')">
+                    <input type="number" class="w-full text-center p-1 font-semibold text-slate-800 dark:text-slate-100 bg-transparent outline-none rounded table-input daily-val" data-index="${i}" oninput="calculateDailyResults()" onpaste="handleExcelPaste(event, ${i})">
+                </td>`;
+                
+                resultHtml += `<td class="p-3 text-center font-bold text-white bg-[#0ea5e9] border-r border-blue-400/30 cursor-pointer hover:bg-blue-600 transition-colors result-cell" id="res-${i}" onclick="handleResultCellClick(${i}, '${cleanDate}')"></td>`;
+            }
+            
+            theadHtml += `</tr>`;
+            inputHtml += `</tr>`;
+            resultHtml += `</tr>`;
+
+            document.getElementById('daily-thead').innerHTML = theadHtml;
+            document.getElementById('daily-tbody').innerHTML = inputHtml + resultHtml;
+            calculateDailyResults();
+        }
+
+        function clearActiveSelection() {
+            if (!selectedCell) return;
+            if (selectedCell.type === 'raw') {
+                const cell = document.getElementById(`cap-cell-${selectedCell.index}`);
+                if (cell) cell.classList.remove('selected-active-cell');
+            } else if (selectedCell.type === 'calculated') {
+                const cell = document.getElementById(`res-${selectedCell.index}`);
+                if (cell) cell.classList.remove('selected-active-cell');
+            }
+        }
+
+        function handleCapacityClick(index, dateStr) {
+            const rawInput = document.querySelector(`.daily-val[data-index="${index}"]`);
+            const rawVal = parseFloat(rawInput.value);
+
+            if (isNaN(rawVal)) return;
+
+            if (selectedCell && selectedCell.index === index && selectedCell.type === 'raw') {
+                clearActiveSelection();
+                selectedCell = null;
+                return;
+            }
+
+            clearActiveSelection();
+
+            selectedCell = {
+                index: index,
+                dateStr: dateStr,
+                type: 'raw'
+            };
+
+            const cell = document.getElementById(`cap-cell-${index}`);
+            if (cell) cell.classList.add('selected-active-cell');
+        }
+
+        function handleResultCellClick(index, dateStr) {
+            const rawInput = document.querySelector(`.daily-val[data-index="${index}"]`);
+            const rawVal = parseFloat(rawInput.value);
+
+            if (isNaN(rawVal)) return;
+
+            if (selectedCell && selectedCell.index === index && selectedCell.type === 'calculated') {
+                clearActiveSelection();
+                selectedCell = null;
+                return;
+            }
+
+            clearActiveSelection();
+
+            selectedCell = {
+                index: index,
+                dateStr: dateStr,
+                type: 'calculated'
+            };
+
+            const cell = document.getElementById(`res-${index}`);
+            if (cell) cell.classList.add('selected-active-cell');
+        }
+
+        function applyToLagrangeTable(tableIndex) {
+            if (!selectedCell) {
+                alert("Önce üst tablodaki kapasite veya sonuç hücrelerinden birine tıklayarak seçmelisiniz!");
+                return;
+            }
+
+            const idx = selectedCell.index;
+            const dateStr = selectedCell.dateStr;
+            const rawInput = document.querySelector(`.daily-val[data-index="${idx}"]`);
+            const rawVal = parseFloat(rawInput.value);
+
+            if (isNaN(rawVal)) return;
+
+            let valueToApply = rawVal;
+            if (selectedCell.type === 'calculated') {
+                const multiplier = parseFloat(document.getElementById('global-multiplier').value) || 1;
+                valueToApply = Math.round(rawVal * multiplier);
+            }
+
+            tableCapacities[tableIndex] = valueToApply;
+            tableDates[tableIndex] = dateStr;
+
+            const capInput = document.getElementById(`l-table-${tableIndex}-cap-input`);
+            if (capInput) capInput.value = valueToApply;
+
+            const titleEl = document.getElementById(`l-table-${tableIndex}-title`);
+            if (titleEl) {
+                titleEl.innerText = `Tablo ${tableIndex + 1} - ${dateStr}`;
+            }
+
+            calcLagrange(tableIndex, valueToApply);
+        }
+
+        function handleManualCapacity(tableIndex, value) {
+            tableDates[tableIndex] = ""; 
+            const titleEl = document.getElementById(`l-table-${tableIndex}-title`);
+            if (titleEl) {
+                titleEl.innerText = `Tablo ${tableIndex + 1}`;
+            }
+            calcLagrange(tableIndex, value);
+        }
+
+        function handleExcelPaste(e, startIndex) {
+            e.preventDefault();
+            let clipboardData = e.clipboardData || window.clipboardData;
+            let pastedText = clipboardData.getData('Text');
+            let numbers = pastedText.split(/[\t\n\r]+/).map(item => item.trim()).filter(item => item !== "" && !isNaN(item));
+            
+            if (numbers.length === 0) return;
+
+            const inputs = document.querySelectorAll('.daily-val');
+            let currentIdx = startIndex;
+
+            numbers.forEach(num => {
+                if (currentIdx < inputs.length) {
+                    inputs[currentIdx].value = num;
+                    currentIdx++;
+                }
+            });
+
+            calculateDailyResults();
+        }
+
+        function calculateDailyResults() {
+            const multiplier = parseFloat(document.getElementById('global-multiplier').value) || 1;
+            document.getElementById('multiplier-label').innerText = `*${multiplier.toString().replace('.', ',')}`;
+            
+            const inputs = document.querySelectorAll('.daily-val');
+            inputs.forEach(input => {
+                const val = parseFloat(input.value);
+                const idx = input.getAttribute('data-index');
+                const resCell = document.getElementById(`res-${idx}`);
+                
+                if (!isNaN(val)) {
+                    resCell.innerText = Math.round(val * multiplier).toLocaleString('tr-TR');
+                } else {
+                    resCell.innerText = '';
+                    if (selectedCell && selectedCell.index == idx) {
+                        clearActiveSelection();
+                        selectedCell = null;
+                    }
+                }
+            });
+        }
+
+        function renderLagrangeTables() {
+            const grid = document.getElementById('lagrange-grid');
+            grid.innerHTML = '';
+            
+            lagrangeTemplates.forEach((data, index) => {
+                const tableId = `l-table-${index}`;
+                const effectiveHours = data.reduce((sum, row) => sum + (row.r > 0 ? row.dur : 0), 0);
+                const assignedDate = tableDates[index] ? ` - ${tableDates[index]}` : '';
+                
+                let tbodyHtml = '';
+                data.forEach((row, rIdx) => {
+                    const isBreak = row.r === 0;
+                    const isNonBreak = row.dur !== 0.25 && row.dur !== 0.5;
+
+                    tbodyHtml += `
+                        <tr class="${isBreak ? 'bg-slate-50 dark:bg-slate-900/30 text-slate-400 dark:text-slate-500' : isNonBreak ? 'bg-amber-50/70 dark:bg-amber-950/20 font-medium' : 'bg-white dark:bg-slate-800'} border-b border-slate-100 dark:border-slate-700/60 transition-colors">
+                            <td class="px-3 py-1.5 whitespace-nowrap flex items-center space-x-2">
+                                ${isNonBreak && !isBreak ? '<span class="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Mola saati olmayan aktif slot"></span>' : ''}
+                                <span class="${isNonBreak && !isBreak ? 'font-bold text-amber-800 dark:text-amber-300' : ''}">${row.t}</span>
+                            </td>
+                            <td class="px-2 py-1 text-center">
+                                <input type="number" step="0.01" value="${isBreak ? 0 : (row.pct || 0).toFixed(2)}" 
+                                       oninput="updatePct(${index}, ${rIdx}, this.value)"
+                                       ${isBreak ? 'disabled' : ''}
+                                       class="w-16 text-center bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded py-0.5 text-xs font-semibold outline-none focus:border-blue-500 ${isBreak ? 'opacity-50' : ''}">
+                            </td>
+                            <td class="px-3 py-1.5 text-right text-indigo-600 dark:text-indigo-400 font-semibold" id="${tableId}-lagrange-${rIdx}">0</td>
+                            <td class="px-3 py-1.5 text-right text-slate-700 dark:text-slate-300" id="${tableId}-multi-${rIdx}">0</td>
+                            <td class="px-3 py-1.5 text-right text-slate-700 dark:text-slate-300" id="${tableId}-single-${rIdx}">0</td>
+                            <td class="px-2 py-1 text-center">
+                                <div class="flex items-center justify-center space-x-1">
+                                    <input type="number" step="1" min="0" max="100" value="${Math.round(row.multiPct * 100)}" 
+                                           oninput="updateMultiPct(${index}, ${rIdx}, this.value)" 
+                                           class="w-12 text-center bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded py-0.5 text-xs outline-none focus:border-blue-500 font-semibold text-slate-600 dark:text-slate-300">
+                                    <span class="text-[10px] text-slate-400">%</span>
+                                </div>
+                            </td>
+                            <td class="px-3 py-1.5 text-center text-slate-500 dark:text-slate-400">${row.dur}</td>
+                            <td class="px-3 py-1.5 text-right font-bold text-emerald-600 dark:text-emerald-400" id="${tableId}-total-${rIdx}">0</td>
+                        </tr>
+                    `;
+                });
+
+                const cardHtml = `
+                    <div id="l-card-${index}" onclick="applyToLagrangeTable(${index})" class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer overflow-hidden flex flex-col transition-all group relative">
+                        <div class="bg-slate-800 dark:bg-slate-900 text-white p-4 flex flex-col sm:flex-row justify-between items-center gap-4 pointer-events-none">
+                            <div>
+                                <h3 class="font-bold text-lg" id="${tableId}-title">Tablo ${index + 1}${assignedDate}</h3>
+                                <p class="text-slate-400 text-xs">Aktif Süre: ${effectiveHours} Saat (Kapasite uygulamak için tıklayın)</p>
+                            </div>
+                            <div class="flex items-center space-x-2 bg-slate-700 dark:bg-slate-800 p-2 rounded-lg border border-slate-600 dark:border-slate-700 pointer-events-auto" onclick="event.stopPropagation()">
+                                <label class="text-sm font-medium text-slate-300 whitespace-nowrap hidden sm:block">Kapasite / Gün:</label>
+                                <input type="number" id="${tableId}-cap-input" value="${tableCapacities[index] || ''}" 
+                                       oninput="handleManualCapacity(${index}, this.value)" 
+                                       placeholder="Örn: 180" 
+                                       class="w-20 bg-slate-900 dark:bg-slate-950 border-none rounded text-white px-2 py-1 outline-none focus:ring-1 focus:ring-blue-400 text-right font-bold">
+                                
+                                <button onclick="exportTableToPDF(${index}, event)" class="bg-rose-500/90 hover:bg-rose-500 text-white p-1.5 rounded transition-colors flex items-center justify-center ml-1" title="Tabloyu PDF Olarak Kaydet">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto flex-grow pointer-events-auto" onclick="event.stopPropagation()">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 uppercase">
+                                    <tr>
+                                        <th class="px-3 py-2">Saat Dilimi</th>
+                                        <th class="px-3 py-2 text-center">Yüzde (%)</th>
+                                        <th class="px-3 py-2 text-right">Lagrange Hr</th>
+                                        <th class="px-3 py-2 text-right">Multi</th>
+                                        <th class="px-3 py-2 text-right">Single</th>
+                                        <th class="px-3 py-2 text-center">Multi Oran</th>
+                                        <th class="px-3 py-2 text-center">Süre</th>
+                                        <th class="px-3 py-2 text-right">Toplam</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${tbodyHtml}</tbody>
+                                <tfoot class="bg-slate-50 dark:bg-slate-900/50 font-bold border-t-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
+                                    <tr>
+                                        <td colspan="7" class="px-3 py-2 text-right">GENEL TOPLAM ÇIKTI:</td>
+                                        <td class="px-3 py-2 text-right text-emerald-700 dark:text-emerald-400 text-sm" id="${tableId}-grandTotal">0</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += cardHtml;
+                
+                if (tableCapacities[index] > 0) {
+                    calcLagrange(index, tableCapacities[index]);
+                }
+            });
+        }
+
+        async function exportTableToPDF(tableIndex, event) {
+            if (event) event.stopPropagation();
+
+            const element = document.getElementById(`l-card-${tableIndex}`);
+            const titleEl = document.getElementById(`l-table-${tableIndex}-title`);
+            
+            let filename = `Lagrange_Tablo_${tableIndex + 1}.pdf`;
+            if (titleEl && titleEl.innerText) {
+                filename = `${titleEl.innerText.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+            }
+
+            const originalClasses = element.className;
+            element.classList.remove('hover:border-blue-400', 'dark:hover:border-blue-500', 'cursor-pointer');
+            
+            const opt = {
+                margin:       [10, 5, 10, 5], 
+                image:        { type: 'jpeg', quality: 1 },
+                html2canvas:  { 
+                    scale: 2, 
+                    useCORS: true, 
+                    scrollX: 0,
+                    scrollY: 0,
+                    onclone: (clonedDoc) => {
+                        const clonedElement = clonedDoc.getElementById(`l-card-${tableIndex}`);
+                        clonedElement.style.width = '1000px'; 
+                        clonedElement.style.maxWidth = '1000px';
+                        clonedElement.style.margin = '0';
+                        
+                        const overflowDiv = clonedElement.querySelector('.overflow-x-auto');
+                        if (overflowDiv) {
+                            overflowDiv.classList.remove('overflow-x-auto');
+                            overflowDiv.style.overflow = 'visible';
+                        }
+                        clonedElement.classList.remove('hover:border-blue-400', 'dark:hover:border-blue-500', 'cursor-pointer');
+                    }
+                },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            try {
+                const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+
+                if ('showSaveFilePicker' in window) {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: filename,
+                        types: [{
+                            description: 'PDF Dosyası',
+                            accept: { 'application/pdf': ['.pdf'] },
+                        }],
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(pdfBlob);
+                    await writable.close();
+                } else {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(pdfBlob);
+                    link.download = filename;
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error("PDF kaydetme işleminde hata oluştu:", err);
+                }
+            } finally {
+                element.className = originalClasses;
+            }
+        }
+
+        function updatePct(tableIndex, rowIndex, value) {
+            const val = parseFloat(value);
+            lagrangeTemplates[tableIndex][rowIndex].pct = isNaN(val) ? 0 : val;
+            calcLagrange(tableIndex, tableCapacities[tableIndex]);
+        }
+
+        function updateMultiPct(tableIndex, rowIndex, value) {
+            let val = parseFloat(value);
+            if (isNaN(val)) val = 60;
+            if (val < 0) val = 0;
+            if (val > 100) val = 100;
+            
+            lagrangeTemplates[tableIndex][rowIndex].multiPct = val / 100;
+            calcLagrange(tableIndex, tableCapacities[tableIndex]);
+        }
+
+        function calcLagrange(tableIndex, capacityVal) {
+            const capacity = parseFloat(capacityVal) || 0;
+            tableCapacities[tableIndex] = capacity;
+            
+            const data = lagrangeTemplates[tableIndex];
+            const tableId = `l-table-${tableIndex}`;
+            const effectiveHours = data.reduce((sum, row) => sum + (row.r > 0 ? row.dur : 0), 0);
+            
+            let grandTotal = 0;
+
+            if (capacity <= 0 || effectiveHours === 0) {
+                data.forEach((row, rIdx) => {
+                    document.getElementById(`${tableId}-lagrange-${rIdx}`).innerText = "0";
+                    document.getElementById(`${tableId}-multi-${rIdx}`).innerText = "0";
+                    document.getElementById(`${tableId}-single-${rIdx}`).innerText = "0";
+                    document.getElementById(`${tableId}-total-${rIdx}`).innerText = "0";
+                });
+                document.getElementById(`${tableId}-grandTotal`).innerText = "0";
+                return;
+            }
+
+            data.forEach((row, rIdx) => {
+                const isBreak = row.r === 0;
+                let lagrange = 0, multi = 0, single = 0, total = 0;
+
+                if (!isBreak) {
+                    // Plan * % = Toplam değerine eşitleniyor
+                    total = capacity * ((row.pct || 0) / 100);
+
+                    // Lagrange HR = Toplam / Effective HR (Slot Süresi)
+                    lagrange = row.dur > 0 ? (total / row.dur) : 0;
+
+                    const mRate = row.multiPct;
+                    const sRate = 1 - mRate;
+                    
+                    multi = lagrange * mRate;
+                    single = lagrange * sRate;
+                    
+                    grandTotal += total;
+                }
+
+                document.getElementById(`${tableId}-lagrange-${rIdx}`).innerText = isBreak ? "-" : formatNumber(lagrange, 2);
+                document.getElementById(`${tableId}-multi-${rIdx}`).innerText = isBreak ? "-" : formatNumber(multi, 2);
+                document.getElementById(`${tableId}-single-${rIdx}`).innerText = isBreak ? "-" : formatNumber(single, 2);
+                document.getElementById(`${tableId}-total-${rIdx}`).innerText = isBreak ? "-" : formatNumber(total, 0);
+            });
+
+            document.getElementById(`${tableId}-grandTotal`).innerText = formatNumber(grandTotal, 0);
+        }
+
+        function formatNumber(num, decimals) {
+            return num.toLocaleString('tr-TR', { 
+                minimumFractionDigits: decimals, 
+                maximumFractionDigits: decimals 
+            });
+        }
+
+        let pdfFiles = [];
+
+        function initPdfMerger() {
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+            const fileSection = document.getElementById('fileSection');
+            const fileList = document.getElementById('fileList');
+            const fileCount = document.getElementById('fileCount');
+            const actionSection = document.getElementById('actionSection');
+            const mergeBtn = document.getElementById('mergeBtn');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            const loading = document.getElementById('loading');
+
+            dropzone.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFiles(e.target.files);
+                }
+                fileInput.value = '';
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add('border-indigo-600', 'bg-indigo-50/70', 'dark:bg-slate-900');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove('border-indigo-600', 'bg-indigo-50/70', 'dark:bg-slate-900');
+                }, false);
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files && files.length > 0) {
+                    handleFiles(files);
+                }
+            });
+
+            clearAllBtn.addEventListener('click', () => {
+                pdfFiles = [];
+                updatePdfUI();
+            });
+
+            mergeBtn.addEventListener('click', async () => {
+                if (pdfFiles.length < 2) {
+                    alert('Lütfen en az 2 adet PDF dosyası seçin.');
+                    return;
+                }
+
+                loading.classList.remove('hidden');
+                actionSection.classList.add('hidden');
+                fileSection.classList.add('hidden');
+                dropzone.classList.add('hidden');
+
+                try {
+                    const { PDFDocument } = PDFLib;
+                    const mergedPdf = await PDFDocument.create();
+
+                    for (let item of pdfFiles) {
+                        const arrayBuffer = await item.file.arrayBuffer();
+                        const pdf = await PDFDocument.load(arrayBuffer);
+                        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                        copiedPages.forEach((page) => mergedPdf.addPage(page));
+                    }
+
+                    const mergedPdfFile = await mergedPdf.save();
+                    const blob = new Blob([mergedPdfFile], { type: 'application/pdf' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'birlestirilmis-belge.pdf';
+                    link.click();
+
+                    pdfFiles = [];
+                    updatePdfUI();
+                } catch (error) {
+                    console.error(error);
+                    alert('PDF dosyaları birleştirilirken bir hata oluştu.');
+                } finally {
+                    loading.classList.add('hidden');
+                    dropzone.classList.remove('hidden');
+                }
+            });
+        }
+
+        function handleFiles(files) {
+            for (let file of files) {
+                if (file.type === 'application/pdf') {
+                    pdfFiles.push({
+                        id: Math.random().toString(36).substring(2, 9),
+                        file: file,
+                        name: file.name,
+                        size: (file.size / (1024 * 1024)).toFixed(2) + ' MB'
+                    });
+                } else {
+                    alert(`"${file.name}" geçerli bir PDF dosyası değil.`);
+                }
+            }
+            updatePdfUI();
+        }
+
+        function updatePdfUI() {
+            const fileSection = document.getElementById('fileSection');
+            const actionSection = document.getElementById('actionSection');
+            const fileCount = document.getElementById('fileCount');
+            const fileList = document.getElementById('fileList');
+
+            if (pdfFiles.length > 0) {
+                fileSection.classList.remove('hidden');
+                actionSection.classList.remove('hidden');
+                fileCount.textContent = pdfFiles.length;
+            } else {
+                fileSection.classList.add('hidden');
+                actionSection.classList.add('hidden');
+            }
+
+            fileList.innerHTML = '';
+            pdfFiles.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl shadow-xs';
+                li.innerHTML = `
+                    <div class="flex items-center space-x-3 overflow-hidden">
+                        <span class="bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-xs w-6 h-6 rounded-full flex items-center justify-center shrink-0">${index + 1}</span>
+                        <div class="truncate">
+                            <p class="font-medium text-slate-800 dark:text-slate-200 text-sm truncate">${item.name}</p>
+                            <span class="text-xs text-slate-400">${item.size}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-1 shrink-0 ml-2">
+                        <button onclick="movePdfItem(${index}, -1)" ${index === 0 ? 'disabled class="opacity-30 cursor-not-allowed"' : ''} class="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors" title="Yukarı Taşı">⬆️</button>
+                        <button onclick="movePdfItem(${index}, 1)" ${index === pdfFiles.length - 1 ? 'disabled class="opacity-30 cursor-not-allowed"' : ''} class="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors" title="Aşağı Taşı">⬇️</button>
+                        <button onclick="removePdfItem(${index})" class="p-1.5 hover:bg-red-100 dark:hover:bg-red-950/50 rounded-lg text-red-500 transition-colors" title="Kaldır">❌</button>
+                    </div>
+                `;
+                fileList.appendChild(li);
+            });
+        }
+
+        window.movePdfItem = function(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex >= 0 && newIndex < pdfFiles.length) {
+                const temp = pdfFiles[index];
+                pdfFiles[index] = pdfFiles[newIndex];
+                pdfFiles[newIndex] = temp;
+                updatePdfUI();
+            }
+        };
+
+        window.removePdfItem = function(index) {
+            pdfFiles.splice(index, 1);
+            updatePdfUI();
+        };
+    </script>
+</body>
+</html>

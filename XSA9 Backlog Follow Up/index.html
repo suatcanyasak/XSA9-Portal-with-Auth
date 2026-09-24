@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="tr" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FC Backlog & Hold Operasyonel Analiz Portalı</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        },
+                        accent: {
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                        },
+                        danger: {
+                            500: '#ef4444',
+                            600: '#dc2626',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card-hover:hover {
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 selection:bg-accent-500 selection:text-white">
+
+    <!-- Top Header Navigation -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-gradient-to-tr from-accent-600 to-brand-500 rounded-xl shadow-lg shadow-accent-500/20 text-white">
+                    <i data-lucide="boxes" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        FC Backlog & Hold Analiz Portalı
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-accent-400 border border-slate-700">v4.1 Projeksiyon & Kök Neden Modülü</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Amazon Fulfillment Center Operasyonel Salım & Değişim Analitiği</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button onclick="downloadSampleTemplate()" class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-lg transition-all shadow-sm">
+                    <i data-lucide="file-down" class="w-4 h-4 text-accent-400"></i>
+                    Örnek CSV Şablonu İndir
+                </button>
+                <div id="headerActionsLoaded" class="hidden flex items-center gap-2">
+                    <button onclick="resetDashboard()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-300 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 rounded-lg transition-all">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        Yeni Dosya Yükle
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+        <!-- INITIAL EMPTY STATE CONTAINER -->
+        <div id="emptyStateContainer" class="flex flex-col items-center justify-center min-h-[60vh] space-y-8 py-10">
+            <div class="text-center max-w-2xl space-y-3">
+                <div class="inline-flex items-center justify-center p-4 bg-accent-500/10 text-accent-400 rounded-2xl ring-1 ring-accent-500/20 mb-2">
+                    <i data-lucide="bar-chart-horizontal" class="w-10 h-10"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Operasyonel Backlog Analizine Başlayın</h2>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    Fulfillment Center (FC) backlog, salım (release) and Gambler Hold verilerinizi analiz etmek için CSV dosyanızı yükleyin. Sistem 15 dakikalık periyotlardaki erime, yığılma ve darboğaz yönelimlerini otomatik olarak hesaplar.
+                </p>
+            </div>
+
+            <div class="w-full max-w-xl">
+                <div id="dropzone" 
+                     class="border-2 border-dashed border-slate-700 hover:border-accent-500 bg-slate-900/60 hover:bg-slate-900/90 rounded-2xl p-8 text-center transition-all cursor-pointer relative group shadow-2xl"
+                     onclick="document.getElementById('csvFileInput').click()"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)"
+                     ondrop="handleFileDrop(event)">
+                    
+                    <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+                    
+                    <div class="flex flex-col items-center justify-center gap-3">
+                        <div class="p-4 bg-slate-800 rounded-full group-hover:scale-110 transition-transform border border-slate-700 group-hover:border-accent-500/50">
+                            <i data-lucide="upload-cloud" class="w-10 h-10 text-accent-400"></i>
+                        </div>
+                        <div class="space-y-1">
+                            <p class="text-base font-semibold text-slate-200">Metrik CSV Dosyanızı Buraya Sürükleyin veya Seçin</p>
+                            <p class="text-xs text-slate-400">Amazon FC Metrik formatını destekler (`Current Workable w/ Total Gambler Holds Units`, `Gambler Holds` vb.)</p>
+                        </div>
+                        <div class="pt-2 flex items-center gap-3">
+                            <span class="px-4 py-2 bg-accent-600 hover:bg-accent-500 text-white rounded-lg font-medium text-xs shadow-lg shadow-accent-600/20 transition-all flex items-center gap-2">
+                                <i data-lucide="folder-open" class="w-4 h-4"></i> Bilgisayardan Seç
+                            </span>
+                            <button type="button" onclick="event.stopPropagation(); loadDemoData();" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg font-medium text-xs transition-all flex items-center gap-2">
+                                <i data-lucide="play-circle" class="w-4 h-4 text-emerald-400"></i> Demo Verisi İle Dene
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD CONTAINER -->
+        <div id="dashboardContainer" class="hidden space-y-6">
+
+            <!-- Data Info & Shift Metadata Bar -->
+            <div id="dataMetaBar" class="glass-card rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-accent-500 shadow-lg">
+                <div class="flex items-center gap-4">
+                    <div class="p-2.5 bg-slate-800 rounded-lg">
+                        <i data-lucide="calendar-clock" class="w-5 h-5 text-accent-400"></i>
+                    </div>
+                    <div>
+                        <h2 id="metaTitle" class="text-sm font-semibold text-white">Analiz Edilen Vardiya Dilimi</h2>
+                        <p id="metaSubtitle" class="text-xs font-mono text-slate-400">-- : -- Aralığı | Toplam -- Veri Kesiti</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="badgeFC" class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">FC: Identified</span>
+                    <button onclick="exportToCSV()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition-all border border-slate-700">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        Raporu İndir (.CSV)
+                    </button>
+                    <button onclick="resetDashboard()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-300 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 rounded-lg transition-all">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        Sıfırla
+                    </button>
+                </div>
+            </div>
+
+            <!-- Executive KPI Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-card glass-card-hover p-4 rounded-xl flex flex-col justify-between transition-all">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-xs font-medium">Başlangıç / Bitiş Workable</span>
+                        <i data-lucide="layers" class="w-4 h-4 text-accent-400"></i>
+                    </div>
+                    <div class="mt-2">
+                        <div class="text-xl font-bold font-mono text-white">
+                            <span id="kpiStartVal">0</span> <span class="text-slate-500 text-xs font-normal">➔</span> <span id="kpiEndVal" class="text-accent-400">0</span>
+                        </div>
+                        <div id="kpiStartEndTimes" class="text-xs text-slate-400 mt-0.5">Saatler: -- ➔ --</div>
+                    </div>
+                </div>
+
+                <div class="glass-card glass-card-hover p-4 rounded-xl flex flex-col justify-between transition-all">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-xs font-medium">Net Backlog Değişimi</span>
+                        <i data-lucide="arrow-left-right" class="w-4 h-4 text-amber-400"></i>
+                    </div>
+                    <div class="mt-2">
+                        <div id="kpiNetDeltaVal" class="text-2xl font-bold font-mono text-white">0</div>
+                        <div id="kpiNetDeltaPct" class="text-xs text-slate-400 mt-0.5">%0.00 Vardiya Boyunca</div>
+                    </div>
+                </div>
+
+                <div class="glass-card glass-card-hover p-4 rounded-xl flex flex-col justify-between transition-all">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-xs font-medium">Toplam Çıkan / İşlenen Hacim</span>
+                        <i data-lucide="check-circle-2" class="w-4 h-4 text-brand-400"></i>
+                    </div>
+                    <div class="mt-2">
+                        <div id="kpiTotalProcessed" class="text-2xl font-bold font-mono text-brand-400">0</div>
+                        <div class="text-xs text-slate-400 mt-0.5">Shipments So Far Toplamı</div>
+                    </div>
+                </div>
+                
+                <div class="glass-card glass-card-hover p-4 rounded-xl flex flex-col justify-between transition-all">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-xs font-medium">Darboğaz Segmentasyonu</span>
+                        <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400"></i>
+                    </div>
+                    <div class="mt-2">
+                        <div id="kpiBottleneckStatus" class="text-lg font-bold font-mono text-white tracking-tight">Dengeli</div>
+                        <div class="text-xs text-slate-400 mt-0.5">Son Durum Yönelimi</div>
+                    </div>
+                </div>
+
+                <div class="glass-card glass-card-hover p-4 rounded-xl flex flex-col justify-between transition-all">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-xs font-medium">00:00 Kapanış Pacing Projeksiyonu</span>
+                        <i data-lucide="timer" class="w-4 h-4 text-fuchsia-400"></i>
+                    </div>
+                    <div class="mt-2">
+                        <div id="kpiPacingStatus" class="text-lg font-bold font-mono text-fuchsia-400">Hesaplanıyor...</div>
+                        <div id="kpiPacingDetail" class="text-xs text-slate-400 mt-0.5">Mevcut hızla 00:00 toplam çıkış</div>
+                    </div>
+                </div>
+
+                <div class="glass-card glass-card-hover p-4 rounded-xl flex flex-col justify-between transition-all">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-xs font-medium">Ineligible Hold Üretim Hızı</span>
+                        <i data-lucide="shield-alert" class="w-4 h-4 text-orange-400"></i>
+                    </div>
+                    <div class="mt-2">
+                        <div id="kpiIneligRate" class="text-2xl font-bold font-mono text-orange-400">0</div>
+                        <div class="text-xs text-slate-400 mt-0.5">Birim / 15 Dk (Ortalama Artış)</div>
+                    </div>
+                </div>
+
+                <div class="glass-card glass-card-hover p-4 rounded-xl flex flex-col justify-between transition-all">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-xs font-medium">Çözülen Gambler Hold (Net)</span>
+                        <i data-lucide="shield-check" class="w-4 h-4 text-sky-400"></i>
+                    </div>
+                    <div class="mt-2">
+                        <div id="kpiHoldResolved" class="text-2xl font-bold font-mono text-sky-400">0</div>
+                        <div id="kpiHoldResolvedPct" class="text-xs text-slate-400 mt-0.5">%0.00 Temizlendi</div>
+                    </div>
+                </div>
+
+                <div class="glass-card glass-card-hover p-4 rounded-xl flex flex-col justify-between transition-all">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="text-xs font-medium">En Yüksek Salım (Eritme)</span>
+                        <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
+                    </div>
+                    <div class="mt-2">
+                        <div id="kpiMaxReleaseVal" class="text-2xl font-bold font-mono text-emerald-400">0</div>
+                        <div id="kpiMaxReleaseTime" class="text-xs text-slate-400 mt-0.5">Aralık: --:--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Interactive Charts Grid -->
+            <div id="chartsContainer" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <div class="lg:col-span-12 glass-card rounded-xl p-5 space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i data-lucide="activity" class="w-4 h-4 text-accent-400"></i>
+                                Backlog Seviyesi, Giren İş ve İşlenen Hacim Dengesi
+                            </h3>
+                            <p class="text-xs text-slate-400">15'er dakikalık periyotlarda stok değişimi ile giren (Inflow) ve çıkan sevkiyat (Shipments Δ) iş akışı</p>
+                        </div>
+                    </div>
+                    <div class="h-80 w-full">
+                        <canvas id="chartMainTrend"></canvas>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-12 glass-card rounded-xl p-5 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i data-lucide="flame" class="w-4 h-4 text-orange-500"></i>
+                                3 Günlük SLA (Days of Backlog) Risk Isı Haritası
+                            </h3>
+                            <p class="text-xs text-slate-400">Hedeflenen SLA yükü: &lt; 0.13 Yeşil (Güvenli) | 0.13 - 0.15 Sarı (Riskli) | &gt; 0.15 Kırmızı (Kritik Blokaj)</p>
+                        </div>
+                    </div>
+                    <div class="h-40 w-full">
+                        <canvas id="chartSLAHeatmap"></canvas>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-12 glass-card rounded-xl p-5 space-y-6">
+                    <div class="border-b border-slate-800 pb-3 flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i data-lucide="lock" class="w-4 h-4 text-sky-400"></i>
+                                Gambler Hold Dağılımı & Değişim Çizgileri (15 Dk Periyotlar)
+                            </h3>
+                            <p class="text-xs text-slate-400">Eligible (Gök Mavisi) vs Ineligible (Mor) miktar farkına göre yüksek kontrastlı alan renklendirmesi</p>
+                        </div>
+                        <div class="flex items-center gap-2 text-[11px] bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                            <span class="text-slate-400">Çizgiler Arası Fark Renklendirmesi:</span>
+                            <span class="px-2.5 py-0.5 rounded text-emerald-300 bg-emerald-950/90 border border-emerald-500/80 font-bold font-mono">🟢 Eligible Üstte (Yeşil)</span>
+                            <span class="text-slate-500">➔</span>
+                            <span class="px-2.5 py-0.5 rounded text-rose-300 bg-rose-950/90 border border-rose-500/80 font-bold font-mono">🔴 Ineligible Üstte (Kırmızı)</span>
+                        </div>
+                    </div>
+                    
+                    <div class="h-80 w-full">
+                        <canvas id="chartHoldsBreakdown"></canvas>
+                    </div>
+
+                    <div class="pt-5 border-t border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-white flex items-center gap-2">
+                                <i data-lucide="percent" class="w-4 h-4 text-accent-400"></i>
+                                Eligible / Ineligible Yüzde (%) Oransal Dağılım Grafiği (%100 Stacked)
+                            </h4>
+                            <span class="text-[10px] text-slate-400 font-mono">15 Dk Oransal Değişim</span>
+                        </div>
+                        <div class="h-48 w-full">
+                            <canvas id="chartHoldsPercentage"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-12 glass-card rounded-xl p-5 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i data-lucide="bar-chart-3" class="w-4 h-4 text-brand-400"></i>
+                                15 Dakikalık Backlog Değişimi & Salım Oranları (Delta Analizi)
+                            </h3>
+                            <p class="text-xs text-slate-400">Yeşil sütunlar **Backlog Salımını / Erimesini (Azalma)**, Kırmızı sütunlar **Backlog Yığılmasını (Artış)** temsil eder</p>
+                        </div>
+                    </div>
+                    <div class="h-64 w-full">
+                        <canvas id="chartBacklogDelta"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Detailed Analysis Main Table -->
+            <div id="tableContainer" class="glass-card rounded-xl overflow-hidden shadow-xl border border-slate-800">
+                <div class="p-4 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i data-lucide="table" class="w-4 h-4 text-accent-400"></i>
+                            Periyodik Operasyonel Backlog & Hold Korelasyon Tablosu (Genel Görünüm)
+                        </h3>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider font-mono">
+                                <th class="py-3 px-4">Zaman Dilimi</th>
+                                <th class="py-3 px-4 text-right">Başlangıç Workable</th>
+                                <th class="py-3 px-4 text-right">Bitiş Workable</th>
+                                <th class="py-3 px-4 text-center">Değişim (Delta)</th>
+                                <th class="py-3 px-4 text-right">Giren İş (Inflow)</th>
+                                <th class="py-3 px-4 text-right">İşlenen (Shipments)</th>
+                                <th class="py-3 px-4 text-center">Darboğaz Teşhisi</th>
+                                <th class="py-3 px-4 text-right">Total Holds</th>
+                                <th class="py-3 px-4 text-center">Elig. / Inelig. (Adet & %)</th>
+                                <th class="py-3 px-4 text-right">Days of Backlog</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hourlyTableBody" class="divide-y divide-slate-800/60 font-mono"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- OTOMATİK BİLDİRİM VE ANALİZ PANELİ -->
+            <div id="perIntervalAnalysisPanel" class="glass-card rounded-xl p-5 border-l-4 border-l-accent-500 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="bot" class="w-5 h-5 text-accent-400 animate-pulse"></i>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Periyot Bazlı Otomatik Cümle Analiz Motoru</h3>
+                    </div>
+                    <span class="text-[11px] font-mono text-slate-400 bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700">Darboğaz Tespiti Aktif</span>
+                </div>
+                <div id="perIntervalAnalysisList" class="space-y-2.5 max-h-[450px] overflow-y-auto pr-2"></div>
+            </div>
+
+            <!-- DETAYLI HESAPLAMA METODOLOJİSİ / FORMÜLİZASYON ALANI -->
+            <div class="glass-card rounded-xl border border-slate-800 overflow-hidden">
+                <div class="p-4 bg-slate-900/90 border-b border-slate-800 cursor-pointer flex items-center justify-between" onclick="document.getElementById('formulaContent').classList.toggle('hidden')">
+                    <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                        <i data-lucide="calculator" class="w-4 h-4 text-accent-400"></i>
+                        Metrik Hesaplama Metodolojisi ve Formülizasyon (Detaylı Açıklama)
+                    </h3>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+                </div>
+                <div id="formulaContent" class="p-5 text-xs text-slate-400 space-y-4 bg-slate-950">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-3">
+                            <h4 class="font-bold text-slate-200 text-sm border-b border-slate-800 pb-1">1. Temel Delta ve İş Akış Formülleri</h4>
+                            <p><strong>Workable Delta (Stok Değişimi):</strong> <code class="bg-slate-800 px-1.5 py-0.5 rounded text-accent-300 font-mono">Bitiş Current Workable - Başlangıç Current Workable</code>. Negatif olması stok erimesini (başarıyı), pozitif olması yığılmayı gösterir.</p>
+                            <p><strong>Giren İş (Inflow):</strong> <code class="bg-slate-800 px-1.5 py-0.5 rounded text-accent-300 font-mono">Bitiş New Workable - Başlangıç New Workable</code>. Periyotta sisteme eklenen yeni iş hacmini verir.</p>
+                            <p><strong>İşlenen Hacim (Shipments Delta):</strong> <code class="bg-slate-800 px-1.5 py-0.5 rounded text-accent-300 font-mono">Bitiş Shipments So Far - Başlangıç Shipments So Far</code>. Periyot boyunca sevkiyatı tamamlanan net birim sayısıdır.</p>
+                        </div>
+                        <div class="space-y-3">
+                            <h4 class="font-bold text-slate-200 text-sm border-b border-slate-800 pb-1">2. Hold Analizi ve Kapanış Pacing Formülleri</h4>
+                            <p><strong>Eligible / Ineligible Dağılımı:</strong> <code class="bg-slate-800 px-1.5 py-0.5 rounded text-sky-300 font-mono">Eligible Adet / Ineligible Adet ve Yüzdeleri</code> doğrudan periyot sonu anlık snapshot verilerinden alınarak adetsel ve yüzde olarak yan yana gösterilir.</p>
+                            <p><strong>00:00 Kapanış Pacing Projeksiyonu:</strong> <code class="bg-slate-800 px-1.5 py-0.5 rounded text-fuchsia-300 font-mono">Mevcut Shipments So Far + (Kalan 15 Dk Periyot Sayısı × Son 3 Periyot Ortalama İşleme Hızı)</code> formülüyle gün sonunda toplam kaç shipments so far olacağı projelendirilir.</p>
+                            <p><strong>Ineligible Hold Üretim Hızı:</strong> Vardiya boyunca yalnızca Ineligible Hold miktarının arttığı periyotlardaki deltaların aritmetik ortalaması alınarak <code class="bg-slate-800 px-1.5 py-0.5 rounded text-orange-300 font-mono">Σ(Pozitif Deltalar) / N</code> şeklinde hesaplanır.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        let parsedMetricsData = null;
+        let chartInstances = {};
+
+        const holdDifferenceFillPlugin = {
+            id: 'holdDifferenceFill',
+            beforeDatasetsDraw(chart) {
+                if (chart.canvas.id !== 'chartHoldsBreakdown') return;
+                const { ctx, chartArea } = chart;
+                if (!chartArea) return;
+
+                const eligibleMeta = chart.getDatasetMeta(1);
+                const ineligibleMeta = chart.getDatasetMeta(3);
+
+                if (!eligibleMeta || !ineligibleMeta || eligibleMeta.hidden || ineligibleMeta.hidden) return;
+
+                const eligiblePoints = eligibleMeta.data;
+                const ineligiblePoints = ineligibleMeta.data;
+
+                if (!eligiblePoints || eligiblePoints.length < 2) return;
+
+                ctx.save();
+                for (let i = 0; i < eligiblePoints.length - 1; i++) {
+                    const p1El = eligiblePoints[i];
+                    const p2El = eligiblePoints[i + 1];
+                    const p1Inel = ineligiblePoints[i];
+                    const p2Inel = ineligiblePoints[i + 1];
+
+                    const elVal1 = chart.data.datasets[1].data[i] || 0;
+                    const inelVal1 = chart.data.datasets[3].data[i] || 0;
+                    const elVal2 = chart.data.datasets[1].data[i + 1] || 0;
+                    const inelVal2 = chart.data.datasets[3].data[i + 1] || 0;
+
+                    const avgEligible = (elVal1 + elVal2) / 2;
+                    const avgIneligible = (inelVal1 + inelVal2) / 2;
+
+                    let fillColor = avgEligible >= avgIneligible
+                        ? 'rgba(0, 230, 118, 0.45)'
+                        : 'rgba(255, 23, 68, 0.45)';
+
+                    ctx.fillStyle = fillColor;
+                    ctx.beginPath();
+                    ctx.moveTo(p1El.x, p1El.y);
+                    ctx.lineTo(p2El.x, p2El.y);
+                    ctx.lineTo(p2Inel.x, p2Inel.y);
+                    ctx.lineTo(p1Inel.x, p1Inel.y);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        };
+
+        const sampleCSV = `FC - Metric,2026-09-20T21:00,2026-09-20T21:15,2026-09-20T21:30,2026-09-20T21:45,2026-09-20T22:00,2026-09-20T22:15,2026-09-20T22:30,2026-09-20T22:45,2026-09-20T23:00
+XSA9 - Total Gambler Holds Units,717,725,732,738,740,680,620,580,568
+XSA9 - Current Workable w/ Total Gambler Holds Units,3373,3200,3050,2910,2802,2650,2500,2410,2349
+XSA9 - Shipments So Far,0,310,615,920,1233,1450,1680,1890,2051
+XSA9 - Gambler Holds Units - Eligible,63,110,160,200,246,180,110,60,37
+XSA9 - Gambler Reference Backlog,0.03,0.03,0.02,0.02,0.02,0.03,0.03,0.04,0.04
+XSA9 - Gambler Holds Units - Ineligible,654,615,572,538,494,500,510,520,531
+XSA9 - Days Of Backlog w/ Total Gambler Holds Units (IPT 3-day),0.17,0.16,0.15,0.14,0.14,0.13,0.13,0.12,0.12
+XSA9 - New Workable,0,150,310,480,639,780,920,1050,1176
+XSA9 - New Workable incl. Total Gambler Holds Units,0,160,320,490,662,750,840,930,1027`;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+
+        function handleDragOver(e) { e.preventDefault(); e.stopPropagation(); }
+        function handleDragLeave(e) { e.preventDefault(); e.stopPropagation(); }
+        function handleFileDrop(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) readAndProcessFile(e.dataTransfer.files[0]);
+        }
+        function handleFileUpload(event) {
+            if (event.target.files[0]) readAndProcessFile(event.target.files[0]);
+        }
+        function readAndProcessFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => processCSV(e.target.result);
+            reader.readAsText(file);
+        }
+        function loadDemoData() { processCSV(sampleCSV); }
+        function resetDashboard() {
+            parsedMetricsData = null;
+            document.getElementById('emptyStateContainer').classList.remove('hidden');
+            document.getElementById('dashboardContainer').classList.add('hidden');
+            document.getElementById('headerActionsLoaded').classList.add('hidden');
+            document.getElementById('csvFileInput').value = '';
+        }
+
+        function downloadSampleTemplate() {
+            const blob = new Blob([sampleCSV], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'FC_Backlog_Sample_Template.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function processCSV(text) {
+            const lines = text.trim().split(/\r?\n/);
+            if (lines.length < 2) return alert('Yüklenen CSV dosyası geçersiz.');
+
+            const headers = lines[0].split(',').map(s => s.trim().replace(/^"|"$/g, ''));
+            const timestamps = headers.slice(1);
+
+            const rowsMap = {};
+            let fcCode = "FC";
+
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                const parts = lines[i].split(',').map(s => s.trim().replace(/^"|"$/g, ''));
+                const metricName = parts[0];
+                const values = parts.slice(1).map(v => parseFloat(v) || 0);
+                rowsMap[metricName] = values;
+
+                if (metricName.includes(' - ')) {
+                    const extracted = metricName.split(' - ')[0].trim();
+                    if (extracted) fcCode = extracted;
+                }
+            }
+
+            const findKey = (sub) => Object.keys(rowsMap).find(k => k.toLowerCase().includes(sub.toLowerCase()));
+
+            const totalHoldsKey = findKey('Total Gambler Holds Units');
+            const workableKey = findKey('Current Workable w/ Total Gambler Holds');
+            const shipmentsKey = findKey('Shipments So Far');
+            const eligibleKey = findKey('Gambler Holds Units - Eligible');
+            const ineligibleKey = findKey('Gambler Holds Units - Ineligible');
+            const newWorkableKey = findKey('New Workable incl. Total Gambler Holds Units') || findKey('New Workable');
+            const daysBacklogKey = findKey('Days Of Backlog');
+
+            const structuredHours = timestamps.map((ts, idx) => {
+                const dateObj = new Date(ts);
+                const hourLabel = isNaN(dateObj.getTime()) ? ts : dateObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', hour12: false });
+                const totalH = rowsMap[totalHoldsKey] ? rowsMap[totalHoldsKey][idx] : 0;
+                const elig = rowsMap[eligibleKey] ? rowsMap[eligibleKey][idx] : 0;
+                const inelig = rowsMap[ineligibleKey] ? rowsMap[ineligibleKey][idx] : 0;
+
+                return {
+                    rawTimestamp: ts,
+                    hourLabel: hourLabel,
+                    totalHolds: totalH,
+                    workable: rowsMap[workableKey] ? rowsMap[workableKey][idx] : 0,
+                    shipmentsSoFar: rowsMap[shipmentsKey] ? rowsMap[shipmentsKey][idx] : 0,
+                    eligible: elig,
+                    ineligible: inelig,
+                    eligiblePct: totalH > 0 ? (elig / totalH) * 100 : 0,
+                    ineligiblePct: totalH > 0 ? (inelig / totalH) * 100 : 0,
+                    cumNewWorkableInclHolds: rowsMap[newWorkableKey] ? rowsMap[newWorkableKey][idx] : 0,
+                    daysOfBacklog: rowsMap[daysBacklogKey] ? rowsMap[daysBacklogKey][idx] : 0,
+                };
+            });
+
+            const intervals = [];
+            for (let i = 0; i < structuredHours.length - 1; i++) {
+                const start = structuredHours[i];
+                const end = structuredHours[i + 1];
+
+                const deltaWorkable = end.workable - start.workable; 
+                const pctWorkable = start.workable > 0 ? (deltaWorkable / start.workable) * 100 : 0;
+                const hourlyInflow = Math.max(0, end.cumNewWorkableInclHolds - start.cumNewWorkableInclHolds);
+                const estimatedProcessed = Math.max(0, end.shipmentsSoFar - start.shipmentsSoFar);
+
+                const deltaEligible = end.eligible - start.eligible;
+                const deltaIneligible = end.ineligible - start.ineligible;
+
+                let intervalBottleneck = "Dengeli";
+                if (hourlyInflow > (estimatedProcessed * 1.5)) {
+                    intervalBottleneck = "Toplama (Picking)";
+                } else if (deltaIneligible > 0 && estimatedProcessed < hourlyInflow) {
+                    intervalBottleneck = "Aşağı Akış (Downstream)";
+                }
+
+                intervals.push({
+                    intervalLabel: `${start.hourLabel} - ${end.hourLabel}`,
+                    startWorkable: start.workable,
+                    endWorkable: end.workable,
+                    deltaWorkable: deltaWorkable,
+                    pctWorkable: pctWorkable,
+                    hourlyInflow: hourlyInflow,
+                    estimatedProcessed: estimatedProcessed,
+                    startHolds: start.totalHolds,
+                    endHolds: end.totalHolds,
+                    eligible: end.eligible,
+                    ineligible: end.ineligible,
+                    deltaEligible: deltaEligible,
+                    deltaIneligible: deltaIneligible,
+                    eligiblePct: end.eligiblePct,
+                    ineligiblePct: end.ineligiblePct,
+                    daysOfBacklog: end.daysOfBacklog,
+                    bottleneck: intervalBottleneck
+                });
+            }
+
+            parsedMetricsData = {
+                fcCode: fcCode,
+                hours: structuredHours,
+                intervals: intervals
+            };
+
+            document.getElementById('emptyStateContainer').classList.add('hidden');
+            document.getElementById('dashboardContainer').classList.remove('hidden');
+            document.getElementById('headerActionsLoaded').classList.remove('hidden');
+
+            updateMetaBar();
+            renderKPIs();
+            renderCharts();
+            renderTable();
+            renderPerIntervalAnalysis();
+            lucide.createIcons();
+        }
+
+        function updateMetaBar() {
+            const hours = parsedMetricsData.hours;
+            document.getElementById('metaTitle').textContent = `Analiz Edilen Vardiya Dilimi: ${hours[0].hourLabel} - ${hours[hours.length - 1].hourLabel}`;
+            document.getElementById('metaSubtitle').textContent = `Toplam ${hours.length} Veri Kesiti | ${parsedMetricsData.intervals.length} Periyot Analiz Edildi`;
+            document.getElementById('badgeFC').textContent = `FC: ${parsedMetricsData.fcCode}`;
+        }
+
+        function renderKPIs() {
+            const hours = parsedMetricsData.hours;
+            const intervals = parsedMetricsData.intervals;
+
+            const startW = hours[0].workable;
+            const endW = hours[hours.length - 1].workable;
+            document.getElementById('kpiStartVal').textContent = startW.toLocaleString('tr-TR');
+            document.getElementById('kpiEndVal').textContent = endW.toLocaleString('tr-TR');
+            document.getElementById('kpiStartEndTimes').textContent = `Saatler: ${hours[0].hourLabel} ➔ ${hours[hours.length - 1].hourLabel}`;
+
+            let maxRelease = intervals[0];
+            intervals.forEach(inv => { if (inv.deltaWorkable < maxRelease.deltaWorkable) maxRelease = inv; });
+
+            document.getElementById('kpiMaxReleaseVal').textContent = Math.abs(maxRelease.deltaWorkable).toLocaleString('tr-TR');
+            document.getElementById('kpiMaxReleaseTime').textContent = `Aralık: ${maxRelease.intervalLabel}`;
+
+            const netDelta = endW - startW;
+            const netDeltaPct = startW > 0 ? (netDelta / startW) * 100 : 0;
+            const netDeltaEl = document.getElementById('kpiNetDeltaVal');
+            netDeltaEl.textContent = (netDelta > 0 ? '+' : '') + netDelta.toLocaleString('tr-TR');
+            netDeltaEl.className = `text-2xl font-bold font-mono ${netDelta <= 0 ? 'text-brand-400' : 'text-rose-400'}`;
+            document.getElementById('kpiNetDeltaPct').textContent = `${netDeltaPct >= 0 ? '+' : ''}${netDeltaPct.toFixed(1)}% Toplam Değişim`;
+
+            const currentShipmentsSoFar = hours[hours.length - 1] ? hours[hours.length - 1].shipmentsSoFar : 0;
+            document.getElementById('kpiTotalProcessed').textContent = currentShipmentsSoFar.toLocaleString('tr-TR');
+
+            const startHolds = hours[0].totalHolds;
+            const endHolds = hours[hours.length - 1].totalHolds;
+            const resolvedHolds = startHolds - endHolds;
+            const resolvedPct = startHolds > 0 ? (resolvedHolds / startHolds) * 100 : 0;
+            document.getElementById('kpiHoldResolved').textContent = resolvedHolds > 0 ? `-${resolvedHolds}` : `+${Math.abs(resolvedHolds)}`;
+            document.getElementById('kpiHoldResolvedPct').textContent = `%${Math.abs(resolvedPct).toFixed(1)} ${resolvedHolds >= 0 ? 'Azalma' : 'Artış'}`;
+
+            let ineligSum = 0, ineligCount = 0;
+            intervals.forEach(inv => {
+                if (inv.deltaIneligible > 0) { ineligSum += inv.deltaIneligible; ineligCount++; }
+            });
+            const ineligRate = ineligCount > 0 ? Math.round(ineligSum / ineligCount) : 0;
+            document.getElementById('kpiIneligRate').textContent = `+${ineligRate}`;
+
+            const lastInv = intervals[intervals.length - 1];
+            const bottleneckEl = document.getElementById('kpiBottleneckStatus');
+            bottleneckEl.textContent = lastInv.bottleneck;
+            bottleneckEl.className = `text-lg font-bold font-mono tracking-tight ${lastInv.bottleneck === 'Dengeli' ? 'text-emerald-400' : (lastInv.bottleneck === 'Toplama (Picking)' ? 'text-amber-400' : 'text-rose-400')}`;
+
+            const lastTimestampStr = hours[hours.length - 1].rawTimestamp;
+            const lastDate = new Date(lastTimestampStr);
+            let targetMidnight = new Date(lastDate);
+            
+            if (targetMidnight.getHours() === 0 && targetMidnight.getMinutes() === 0) {
+                targetMidnight.setDate(targetMidnight.getDate() + 1);
+            } else {
+                targetMidnight.setHours(24, 0, 0, 0); 
+            }
+
+            const minsToMidnight = Math.max(0, (targetMidnight - lastDate) / 60000);
+            const intervalsToMidnight = minsToMidnight / 15;
+            
+            const last3 = intervals.slice(-3);
+            const avgProcessed = last3.length > 0 ? last3.reduce((sum, i) => sum + i.estimatedProcessed, 0) / last3.length : 0;
+            const projectedTotalShipments = currentShipmentsSoFar + (avgProcessed * intervalsToMidnight);
+
+            const pacingEl = document.getElementById('kpiPacingStatus');
+            if (minsToMidnight > 0 && avgProcessed > 0) {
+                pacingEl.textContent = `${Math.round(projectedTotalShipments).toLocaleString('tr-TR')} Birim`;
+                pacingEl.className = "text-lg font-bold font-mono text-fuchsia-400";
+                document.getElementById('kpiPacingDetail').textContent = `Mevcut hızla 00:00 toplam çıkış projeksiyonu`;
+            } else {
+                pacingEl.textContent = "Veri Yetersiz / Geçmiş";
+                pacingEl.className = "text-lg font-bold font-mono text-slate-400";
+                document.getElementById('kpiPacingDetail').textContent = "--";
+            }
+        }
+
+        function renderCharts() {
+            const hours = parsedMetricsData.hours;
+            const intervals = parsedMetricsData.intervals;
+
+            Object.values(chartInstances).forEach(chart => chart.destroy());
+
+            const xAxis15mConfig = {
+                grid: { color: 'rgba(255,255,255,0.05)' },
+                ticks: { color: '#94a3b8', autoSkip: false, maxRotation: 45, minRotation: 45, font: { size: 10 } }
+            };
+
+            const ctx1 = document.getElementById('chartMainTrend').getContext('2d');
+            chartInstances.mainTrend = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: hours.map(h => h.hourLabel),
+                    datasets: [
+                        {
+                            label: 'Current Workable (Holds Dahil)',
+                            data: hours.map(h => h.workable),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2.5,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 2.5
+                        },
+                        {
+                            label: 'İşlenen (Shipments Δ)',
+                            data: [0, ...intervals.map(i => i.estimatedProcessed)],
+                            type: 'bar',
+                            backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                            borderColor: '#22c55e',
+                            borderWidth: 1,
+                            borderRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                    scales: { x: xAxis15mConfig, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } } }
+                }
+            });
+
+            const ctxSLA = document.getElementById('chartSLAHeatmap').getContext('2d');
+            const slaValues = hours.map(h => h.daysOfBacklog);
+            const slaColors = slaValues.map(v => {
+                if(v > 0.15) return 'rgba(239, 68, 68, 0.8)';
+                if(v >= 0.13) return 'rgba(245, 158, 11, 0.8)';
+                return 'rgba(34, 197, 94, 0.8)';
+            });
+            chartInstances.slaHeatmap = new Chart(ctxSLA, {
+                type: 'bar',
+                data: {
+                    labels: hours.map(h => h.hourLabel),
+                    datasets: [{
+                        label: 'Days of Backlog',
+                        data: slaValues,
+                        backgroundColor: slaColors,
+                        borderWidth: 0,
+                        borderRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        x: { display: true, ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 45, font: { size: 9 } } },
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            const ctx2 = document.getElementById('chartHoldsBreakdown').getContext('2d');
+            chartInstances.holds = new Chart(ctx2, {
+                type: 'bar',
+                plugins: [holdDifferenceFillPlugin],
+                data: {
+                    labels: hours.map(h => h.hourLabel),
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Eligible (Sütun)',
+                            data: hours.map(h => h.eligible),
+                            backgroundColor: 'rgba(56, 189, 248, 0.65)',
+                            borderColor: '#38bdf8',
+                            borderWidth: 1,
+                            borderRadius: 3,
+                            order: 2
+                        },
+                        {
+                            type: 'line',
+                            label: 'Eligible Değişim Trendi',
+                            data: hours.map(h => h.eligible),
+                            borderColor: '#00E676',
+                            borderWidth: 3,
+                            pointRadius: 3.5,
+                            pointBackgroundColor: '#00E676',
+                            fill: false,
+                            tension: 0.3,
+                            order: 1
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Ineligible (Sütun)',
+                            data: hours.map(h => h.ineligible),
+                            backgroundColor: 'rgba(168, 85, 247, 0.65)',
+                            borderColor: '#a855f7',
+                            borderWidth: 1,
+                            borderRadius: 3,
+                            order: 2
+                        },
+                        {
+                            type: 'line',
+                            label: 'Ineligible Değişim Trendi',
+                            data: hours.map(h => h.ineligible),
+                            borderColor: '#FF1744',
+                            borderWidth: 3,
+                            pointRadius: 3.5,
+                            pointBackgroundColor: '#FF1744',
+                            fill: false,
+                            tension: 0.3,
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                    scales: { x: xAxis15mConfig, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } } }
+                }
+            });
+
+            const ctxPct = document.getElementById('chartHoldsPercentage').getContext('2d');
+            chartInstances.holdsPct = new Chart(ctxPct, {
+                type: 'bar',
+                data: {
+                    labels: hours.map(h => h.hourLabel),
+                    datasets: [
+                        {
+                            label: 'Eligible (%)',
+                            data: hours.map(h => h.eligiblePct.toFixed(1)),
+                            backgroundColor: 'rgba(56, 189, 248, 0.85)',
+                            stack: 'stack1'
+                        },
+                        {
+                            label: 'Ineligible (%)',
+                            data: hours.map(h => h.ineligiblePct.toFixed(1)),
+                            backgroundColor: 'rgba(168, 85, 247, 0.85)',
+                            stack: 'stack1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1', font: { size: 11 } } },
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: %${ctx.parsed.y}` } }
+                    },
+                    scales: {
+                        x: xAxis15mConfig,
+                        y: { stacked: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', callback: (v) => `%${v}` } }
+                    }
+                }
+            });
+
+            const ctx3 = document.getElementById('chartBacklogDelta').getContext('2d');
+            chartInstances.delta = new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: intervals.map(i => i.intervalLabel),
+                    datasets: [{
+                        label: '15 Dk Backlog Değişimi (Delta)',
+                        data: intervals.map(i => i.deltaWorkable),
+                        backgroundColor: intervals.map(i => i.deltaWorkable <= 0 ? 'rgba(0, 230, 118, 0.8)' : 'rgba(255, 23, 68, 0.8)'),
+                        borderColor: intervals.map(i => i.deltaWorkable <= 0 ? '#00E676' : '#FF1744'),
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: xAxis15mConfig, y: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#94a3b8' } } }
+                }
+            });
+        }
+
+        function renderTable() {
+            const intervals = parsedMetricsData.intervals;
+            const tbody = document.getElementById('hourlyTableBody');
+            tbody.innerHTML = '';
+
+            intervals.forEach((inv) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-800/40 transition-colors border-b border-slate-800/50';
+                const isReduction = inv.deltaWorkable <= 0;
+                const badgeClass = isReduction ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+                const deltaPrefix = inv.deltaWorkable > 0 ? '+' : '';
+
+                let bottleneckBadge = '';
+                if(inv.bottleneck === 'Toplama (Picking)') {
+                    bottleneckBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30">Toplama (Giriş)</span>`;
+                } else if(inv.bottleneck === 'Aşağı Akış (Downstream)') {
+                    bottleneckBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400 border border-rose-500/30">Aşağı Akış (Hold)</span>`;
+                } else {
+                    bottleneckBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-slate-700 text-slate-300">Dengeli</span>`;
+                }
+
+                const eligIneligDisplay = `<span class="text-sky-400 font-bold">${inv.eligible}</span> / <span class="text-purple-400 font-bold">${inv.ineligible}</span> <span class="text-slate-400 font-normal">(%${inv.eligiblePct.toFixed(0)} / %${inv.ineligiblePct.toFixed(0)})</span>`;
+
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 font-semibold text-slate-200">${inv.intervalLabel}</td>
+                    <td class="py-3.5 px-4 text-right text-slate-300">${inv.startWorkable.toLocaleString('tr-TR')}</td>
+                    <td class="py-3.5 px-4 text-right text-slate-300 font-bold">${inv.endWorkable.toLocaleString('tr-TR')}</td>
+                    <td class="py-3.5 px-4 text-center">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badgeClass}">
+                            ${deltaPrefix}${inv.deltaWorkable.toLocaleString('tr-TR')}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 text-right text-slate-300">+${inv.hourlyInflow.toLocaleString('tr-TR')}</td>
+                    <td class="py-3.5 px-4 text-right text-emerald-400 font-bold">${inv.estimatedProcessed.toLocaleString('tr-TR')}</td>
+                    <td class="py-3.5 px-4 text-center">${bottleneckBadge}</td>
+                    <td class="py-3.5 px-4 text-right text-slate-300">${inv.endHolds.toLocaleString('tr-TR')}</td>
+                    <td class="py-3.5 px-4 text-center text-[11px]">${eligIneligDisplay}</td>
+                    <td class="py-3.5 px-4 text-right text-slate-400">${inv.daysOfBacklog.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderPerIntervalAnalysis() {
+            const intervals = parsedMetricsData.intervals;
+            const container = document.getElementById('perIntervalAnalysisList');
+            if (!container) return;
+            container.innerHTML = '';
+
+            intervals.forEach((inv) => {
+                const item = document.createElement('div');
+                const isIncrease = inv.deltaWorkable > 0;
+                const isDecrease = inv.deltaWorkable < 0;
+
+                let badgeHtml = '';
+                let borderClass = '';
+
+                if (isIncrease) {
+                    badgeHtml = `<span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40">ARTTI (+${inv.deltaWorkable.toLocaleString('tr-TR')})</span>`;
+                    borderClass = 'border-l-4 border-l-rose-500';
+                } else if (isDecrease) {
+                    badgeHtml = `<span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">AZALDI (${inv.deltaWorkable.toLocaleString('tr-TR')})</span>`;
+                    borderClass = 'border-l-4 border-l-emerald-500';
+                } else {
+                    badgeHtml = `<span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-slate-700 text-slate-300 border border-slate-600">SABİT (0)</span>`;
+                    borderClass = 'border-l-4 border-l-slate-600';
+                }
+
+                let sentences = [];
+                if (inv.bottleneck === 'Toplama (Picking)') {
+                    sentences.push(`Sisteme giren yeni iş miktarı (+${inv.hourlyInflow.toLocaleString('tr-TR')} birim), işlenen miktarı (+${inv.estimatedProcessed.toLocaleString('tr-TR')} birim) ciddi şekilde aştığı için ana yığılma kaynağı <strong>Toplama (Giriş)</strong> tarafında tespit edildi.`);
+                } else if (inv.bottleneck === 'Aşağı Akış (Downstream)') {
+                    sentences.push(`İşlenen sevkiyat yetersiz kalırken, Ineligible Hold miktarındaki +${inv.deltaIneligible} birimlik artış nedeniyle darboğaz <strong>Aşağı Akış / Packing (Hold)</strong> kaynaklı olarak tespit edildi.`);
+                } else if (isDecrease) {
+                    sentences.push(`Operasyonel sevkiyat hızı (+${inv.estimatedProcessed.toLocaleString('tr-TR')} birim), sisteme giren işi (+${inv.hourlyInflow.toLocaleString('tr-TR')} birim) geride bırakarak stok erimesini sağladı.`);
+                    if (inv.deltaIneligible < 0) sentences.push(`Ineligible hold birimlerinin ${Math.abs(inv.deltaIneligible)} birim çözülmesi erimeyi destekledi.`);
+                } else {
+                    sentences.push(`Giren ve çıkan iş ile hold çözülmeleri dengede seyretti.`);
+                }
+
+                item.className = `p-3.5 rounded-lg bg-slate-900/90 border border-slate-800/80 text-xs leading-relaxed space-y-1.5 shadow-sm ${borderClass}`;
+                item.innerHTML = `
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-slate-100 font-mono text-xs flex items-center gap-1.5">
+                                <i data-lucide="clock" class="w-3.5 h-3.5 text-accent-400"></i>
+                                [${inv.intervalLabel}]
+                            </span>
+                            ${badgeHtml}
+                        </div>
+                        <div class="text-[11px] text-slate-400 font-mono">
+                            Son Backlog: <strong class="text-white">${inv.endWorkable.toLocaleString('tr-TR')}</strong> birim
+                        </div>
+                    </div>
+                    <p class="text-slate-300 font-sans">
+                        ${sentences.join(' ')}
+                    </p>
+                    <div class="flex items-center gap-4 pt-1 text-[10px] text-slate-400 font-mono border-t border-slate-800/60">
+                        <span>📥 Giren İş: +${inv.hourlyInflow.toLocaleString('tr-TR')}</span>
+                        <span>📤 İşlenen: ${inv.estimatedProcessed.toLocaleString('tr-TR')}</span>
+                        <span>🔒 Ineligible Farkı: ${inv.deltaIneligible > 0 ? '+'+inv.deltaIneligible : inv.deltaIneligible}</span>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+            lucide.createIcons();
+        }
+
+        function exportToCSV() {
+            if (!parsedMetricsData) return;
+            const intervals = parsedMetricsData.intervals;
+            let csvRows = [['Zaman Dilimi', 'Baslangic Workable', 'Bitis Workable', 'Delta Miktar', 'Giren Is (Inflow)', 'Tahmini Islenen', 'Darboğaz Tespiti', 'Total Holds', 'Eligible Holds', 'Ineligible Holds', 'Days of Backlog']];
+
+            intervals.forEach(inv => {
+                csvRows.push([
+                    `"${inv.intervalLabel}"`,
+                    inv.startWorkable,
+                    inv.endWorkable,
+                    inv.deltaWorkable,
+                    inv.hourlyInflow,
+                    inv.estimatedProcessed,
+                    inv.bottleneck,
+                    inv.endHolds,
+                    inv.eligible,
+                    inv.ineligible,
+                    inv.daysOfBacklog
+                ]);
+            });
+
+            const blob = new Blob([csvRows.map(e => e.join(',')).join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('header', url);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `FC_Backlog_Analizi_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,706 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRB Bridge Günlük Rapor Oluşturucu</title>
+    <!-- PDF'e dönüştürmek için html2pdf kütüphanesi -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg-color: #f1f5f9;
+            --sidebar-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0; padding: 0;
+            display: flex; height: 100vh; overflow: hidden;
+        }
+        .app-container { display: flex; width: 100%; height: 100vh; }
+        
+        /* Sol Menü */
+        .sidebar {
+            width: 450px; background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column;
+            height: 100%; box-shadow: 2px 0 10px rgba(0,0,0,0.05); z-index: 10;
+        }
+        .sidebar-header {
+            padding: 25px 25px 15px 25px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: #f8fafc;
+        }
+        .sidebar-header h2 { margin: 0; font-size: 1.25rem; }
+        .sidebar-header p { margin: 5px 0 15px 0; font-size: 0.85rem; color: var(--text-muted); }
+        
+        .btn-upload-pdf {
+            display: flex; justify-content: center; align-items: center; gap: 8px;
+            width: 100%; padding: 10px; 
+            background-color: #eff6ff; color: var(--primary-dark);
+            border: 1px dashed var(--primary); border-radius: 6px;
+            font-weight: 600; font-size: 0.9rem; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-upload-pdf:hover { background-color: #dbeafe; border-style: solid; }
+
+        /* Rapor Yönetim Paneli */
+        .report-manager {
+            padding: 15px 25px; background: #f8fafc;
+            border-bottom: 1px solid var(--border-color);
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .rm-row { display: flex; gap: 10px; align-items: center; }
+        .rm-select { 
+            flex: 1; padding: 8px; border-radius: 6px; 
+            border: 1px solid var(--border-color); font-family: inherit; font-size: 0.9rem;
+        }
+        .rm-btn { 
+            padding: 8px 12px; border-radius: 6px; border: none; 
+            font-weight: 600; cursor: pointer; color: white; font-family: inherit; font-size: 0.85rem;
+        }
+        .rm-btn-add { background: var(--primary); }
+        .rm-btn-add:hover { background: var(--primary-dark); }
+        .rm-btn-del { background: #ef4444; }
+        .rm-btn-del:hover { background: #dc2626; }
+        .rm-time { padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-family: inherit; width: 100px;}
+
+        .form-container { flex: 1; overflow-y: auto; padding: 25px; }
+        
+        /* Form Elemanları */
+        .form-group { margin-bottom: 20px; }
+        .label-row { display: flex; align-items: center; margin-bottom: 8px; }
+        .label-row input[type="checkbox"] {
+            margin-right: 10px; width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);
+        }
+        .label-row label { font-weight: 600; font-size: 0.85rem; cursor: pointer; margin: 0; }
+        input[type="text"], textarea {
+            width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px;
+            font-family: inherit; font-size: 0.9rem; box-sizing: border-box; 
+            transition: all 0.2s; background-color: #f8fafc;
+        }
+        input[type="text"]:focus, textarea:focus {
+            outline: none; border-color: var(--primary);
+            background-color: #ffffff; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+        }
+        textarea { resize: vertical; min-height: 70px; }
+        
+        /* İmaj Yükleme Alanları */
+        .section-divider {
+            margin: 30px 0 15px 0; font-weight: 700; font-size: 1rem;
+            border-bottom: 2px solid var(--border-color); padding-bottom: 10px;
+        }
+        .category-wrapper { margin-bottom: 20px; }
+        .image-drop-zone {
+            border: 2px dashed #cbd5e1; border-radius: 8px; padding: 15px;
+            text-align: center; margin-bottom: 8px; cursor: pointer;
+            background-color: #f8fafc; transition: all 0.2s; outline: none; position: relative;
+        }
+        .image-drop-zone:hover, .image-drop-zone:focus { border-color: var(--primary); background-color: #eff6ff; }
+        .image-drop-zone.has-image { border-color: #22c55e; border-style: solid; background-color: #f0fdf4; }
+        .image-drop-zone .zone-text { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); pointer-events: none; line-height: 1.4; }
+        .image-drop-zone.has-image .zone-text { color: #166534; }
+        .btn-remove-img {
+            display: none; margin-top: 8px; padding: 6px 12px;
+            font-size: 0.75rem; font-weight: 600; color: #ef4444;
+            background: #fee2e2; border: none; border-radius: 4px; cursor: pointer;
+        }
+        .image-drop-zone.has-image .btn-remove-img { display: inline-block; }
+        .btn-remove-img:hover { background: #fca5a5; }
+
+        .preview-container { display: flex; flex-wrap: wrap; gap: 10px; }
+        .thumbnail-wrapper {
+            position: relative; width: 65px; height: 65px; border-radius: 6px; 
+            border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; background: #fff;
+        }
+        .thumbnail-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+        .btn-remove-single {
+            position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; 
+            background: rgba(239, 68, 68, 0.9); color: white; border: none; border-radius: 50%;
+            font-size: 11px; font-weight: bold; cursor: pointer; display: flex; 
+            align-items: center; justify-content: center; padding: 0; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: background 0.2s;
+        }
+        .btn-remove-single:hover { background: #dc2626; }
+
+        .btn {
+            display: flex; justify-content: center; align-items: center;
+            width: 100%; padding: 14px; background-color: var(--primary);
+            color: white; border: none; border-radius: 8px;
+            font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s; margin-top: 20px;
+        }
+        .btn:hover { background-color: var(--primary-dark); }
+        
+        /* Sağ Önizleme (A4) */
+        .preview-wrapper {
+            flex: 1; padding: 40px; overflow-y: auto; background-color: #cbd5e1;
+            display: flex; justify-content: center; align-items: flex-start;
+        }
+        .a4-paper {
+            background: white; width: 210mm; min-height: 297mm; padding: 20mm; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2); box-sizing: border-box; position: relative;
+        }
+        #report-content { font-family: 'Inter', sans-serif; color: #1e293b; }
+        .report-header { border-bottom: 3px solid var(--primary); padding-bottom: 10px; margin-bottom: 25px; }
+        .report-header h1 { margin: 0; font-size: 28px; color: #0f172a; font-weight: 700; }
+        
+        /* Dinamik Rapor Alanları Stilleri */
+        .report-instance {
+            margin-bottom: 40px; padding-bottom: 20px;
+            border-bottom: 2px dashed #cbd5e1; page-break-inside: auto;
+        }
+        .report-instance:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        
+        .time-header {
+            font-size: 16px; font-weight: 700; color: var(--primary-dark);
+            margin: 0 0 15px 0; display: flex; align-items: center; gap: 8px;
+            background: #eff6ff; padding: 8px 12px; border-radius: 6px; border-left: 4px solid var(--primary);
+        }
+
+        .report-table {
+            width: 100%; border-collapse: collapse; margin-bottom: 25px;
+            border: 1px solid var(--border-color); border-radius: 8px; border-style: hidden;
+            box-shadow: 0 0 0 1px var(--border-color);
+        }
+        .report-table th, .report-table td {
+            padding: 14px 18px; text-align: left; vertical-align: top;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .report-table tr:last-child td { border-bottom: none; }
+        .report-table th { background-color: #f8fafc; font-size: 13px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+        .report-table td:first-child { width: 32%; font-weight: 600; background-color: #f8fafc; border-right: 1px solid var(--border-color); }
+        .report-table td { font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+        
+        .report-screenshots { display: flex; flex-direction: column; gap: 20px; }
+        .screenshot-item h4 {
+            margin: 0 0 15px 0; padding-bottom: 5px; font-size: 15px;
+            color: var(--primary-dark); border-bottom: 1px solid var(--border-color);
+            page-break-after: avoid; 
+        }
+        .screenshot-item img {
+            max-width: 100%; height: auto; border: 1px solid var(--border-color);
+            border-radius: 4px; display: block; margin: 0 auto 15px auto; page-break-inside: avoid; 
+        }
+
+        .report-footer { position: absolute; top: 20px; right: 20px; font-weight: 600; color: #64748b;}
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        #loader { display: none; text-align: center; margin-top: 10px; font-size: 0.9rem; font-weight: 600; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- SOL PANEL -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Rapor Oluşturucu</h2>
+                <p>Günün raporlarını ekleyin, önizleyin ve indirin.</p>
+                <button type="button" class="btn-upload-pdf" onclick="document.getElementById('pdf-input').click()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    Önceki Bir PDF'i Yükle ve Düzenle
+                </button>
+                <input type="file" id="pdf-input" accept="application/pdf" style="display:none" onchange="handlePDFUpload(event)">
+            </div>
+            
+            <!-- YENİ: Rapor Yönetim Paneli -->
+            <div class="report-manager">
+                <div class="rm-row">
+                    <select id="report-selector" class="rm-select" onchange="switchReport(this.value)"></select>
+                    <button type="button" class="rm-btn rm-btn-add" onclick="addReport()">+ Yeni Rapor</button>
+                    <button type="button" class="rm-btn rm-btn-del" onclick="deleteReport()">Sil</button>
+                </div>
+                <div class="rm-row">
+                    <label style="font-size: 0.85rem; font-weight: 600;">Seçili Raporun Saati:</label>
+                    <input type="time" id="report-time" class="rm-time" onchange="updateTime(this.value)">
+                </div>
+            </div>
+
+            <div class="form-container">
+                <form id="report-form" onsubmit="event.preventDefault();">
+                    
+                    <!-- Dinamik Metin Alanları -->
+                    <div id="text-fields-container"></div>
+                    
+                    <!-- Ekran Görüntüleri Alanı -->
+                    <div class="section-divider">Ekran Görüntüleri Ekle</div>
+                    <div id="image-upload-container"></div>
+
+                    <button type="button" class="btn" onclick="generatePDF()">Tüm Raporları PDF İndir</button>
+                    <div id="loader">PDF Hazırlanıyor, lütfen bekleyin...</div>
+                </form>
+            </div>
+        </div>
+
+        <!-- SAĞ PANEL -->
+        <div class="preview-wrapper">
+            <div class="a4-paper" id="report-content">
+                <div class="report-header">
+                    <h1>TRB Bridge Daily Report</h1>
+                </div>
+                <div class="report-footer">
+                    Tarih: <span id="current-date"></span>
+                </div>
+                
+                <!-- Tüm Raporlar Buraya Dinamik Gelecek -->
+                <div id="dynamic-reports-container"></div>
+                
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. VERİ YAPISI ---
+        const textFields = [
+            { id: 'summary', label: 'Issue Summary (Problem Özeti)' },
+            { id: 'happened', label: 'What Happened? (Ne Oldu?)' },
+            { id: 'impact', label: 'Impact (Etki)' },
+            { id: 'cause', label: 'Root Cause (Kök Neden)' },
+            { id: 'containment', label: 'Containment Action (Anlık Aksiyon)' },
+            { id: 'corrective', label: 'Corrective Action (Kalıcı Aksiyon)' },
+            { id: 'owner', label: 'Owner (Sorumlu Kişi)' }
+        ];
+
+        const imageCategories = [
+            { id: 'cora', label: '1. Cora / Newton' },
+            { id: 'ledger', label: '2. Ledger - Daily Ship Rates' },
+            { id: 'rodeo', label: '3. Rodeo - Work Pool' },
+            { id: 'collate', label: '4. Collate' },
+            { id: 'pick', label: 'A. Pick Workforce' },
+            { id: 'lagrange', label: 'B. Lagrange' },
+            { id: 'batch', label: 'C. Batch Limit & Pick Rate' },
+            { id: 'others', label: 'Others if needed' }
+        ];
+
+        // --- 2. UYGULAMA DURUMU (STATE) ---
+        let appState = {
+            activeReportId: 1,
+            nextId: 2,
+            reports: []
+        };
+
+        // --- 3. BAŞLANGIÇ VE DOM KURULUMU ---
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById('current-date').innerText = new Date().toLocaleDateString('tr-TR');
+            
+            buildFormDOM();
+            
+            // İlk varsayılan raporu oluştur
+            appState.reports.push(createNewReportObject(1));
+            updateReportSelector();
+            loadFormFromState();
+            renderRightPanel();
+        });
+
+        function buildFormDOM() {
+            const formContainer = document.getElementById('text-fields-container');
+            
+            // Metin Alanları
+            textFields.forEach(field => {
+                const group = document.createElement('div');
+                group.className = 'form-group';
+                group.innerHTML = `
+                    <div class="label-row">
+                        <input type="checkbox" id="check-${field.id}">
+                        <label for="in-${field.id}">${field.label}</label>
+                    </div>
+                    <textarea id="in-${field.id}"></textarea>
+                `;
+                formContainer.appendChild(group);
+
+                // Dinamik Güncelleme Tetikleyicileri
+                document.getElementById(`in-${field.id}`).addEventListener('input', (e) => {
+                    const report = appState.reports.find(r => r.id === appState.activeReportId);
+                    if(report) {
+                        report.fields[field.id].value = e.target.value;
+                        renderRightPanel();
+                    }
+                });
+
+                document.getElementById(`check-${field.id}`).addEventListener('change', (e) => {
+                    const report = appState.reports.find(r => r.id === appState.activeReportId);
+                    if(report) {
+                        report.fields[field.id].checked = e.target.checked;
+                        renderRightPanel();
+                    }
+                });
+            });
+
+            // Resim Alanları
+            const imgUploadContainer = document.getElementById('image-upload-container');
+            imageCategories.forEach(cat => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'category-wrapper';
+                
+                const dropZone = document.createElement('div');
+                dropZone.className = 'image-drop-zone';
+                dropZone.id = `dropzone-${cat.id}`;
+                dropZone.tabIndex = 0; 
+                dropZone.innerHTML = `
+                    <span class="zone-text" id="zonetext-${cat.id}">${cat.label}<br>(Tıkla, Çoklu Seç veya Yapıştır)</span>
+                    <input type="file" accept="image/*" multiple hidden>
+                    <br><button type="button" class="btn-remove-img" id="btn-clear-${cat.id}">Tümünü Sil</button>
+                `;
+                
+                const previewContainer = document.createElement('div');
+                previewContainer.className = 'preview-container';
+                previewContainer.id = `preview-${cat.id}`;
+
+                wrapper.appendChild(dropZone);
+                wrapper.appendChild(previewContainer);
+                imgUploadContainer.appendChild(wrapper);
+
+                const fileInput = dropZone.querySelector('input');
+                const removeBtn = dropZone.querySelector('.btn-remove-img');
+
+                dropZone.addEventListener('click', (e) => { if (e.target !== removeBtn) fileInput.click(); });
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                        Array.from(e.target.files).forEach(file => processFile(file, cat.id));
+                        e.target.value = ''; 
+                    }
+                });
+
+                dropZone.addEventListener('paste', (e) => {
+                    e.preventDefault();
+                    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                    for (let index in items) {
+                        if (items[index].kind === 'file') {
+                            processFile(items[index].getAsFile(), cat.id);
+                        }
+                    }
+                });
+
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const report = appState.reports.find(r => r.id === appState.activeReportId);
+                    if(report) {
+                        report.images[cat.id] = [];
+                        loadFormFromState();
+                        renderRightPanel();
+                    }
+                });
+            });
+        }
+
+        // --- 4. RAPOR YÖNETİM FONKSİYONLARI ---
+        function createNewReportObject(id) {
+            const report = {
+                id: id,
+                time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                fields: {},
+                images: {}
+            };
+            textFields.forEach(f => { report.fields[f.id] = { checked: true, value: '' }; });
+            imageCategories.forEach(cat => { report.images[cat.id] = []; });
+            return report;
+        }
+
+        function updateReportSelector() {
+            const selector = document.getElementById('report-selector');
+            selector.innerHTML = '';
+            appState.reports.forEach((r, i) => {
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.text = `Rapor ${i + 1} (${r.time})`;
+                if (r.id === appState.activeReportId) opt.selected = true;
+                selector.appendChild(opt);
+            });
+        }
+
+        function switchReport(id) {
+            appState.activeReportId = parseInt(id);
+            loadFormFromState();
+        }
+
+        function addReport() {
+            const newId = appState.nextId++;
+            appState.reports.push(createNewReportObject(newId));
+            appState.activeReportId = newId;
+            updateReportSelector();
+            loadFormFromState();
+            renderRightPanel();
+        }
+
+        function deleteReport() {
+            if (appState.reports.length === 1) {
+                alert("Son raporu silemezsiniz. Lütfen içeriğini temizleyin.");
+                return;
+            }
+            if(confirm("Seçili raporu silmek istediğinize emin misiniz?")) {
+                appState.reports = appState.reports.filter(r => r.id !== appState.activeReportId);
+                appState.activeReportId = appState.reports[0].id; // İlk rapora dön
+                updateReportSelector();
+                loadFormFromState();
+                renderRightPanel();
+            }
+        }
+
+        function updateTime(newTime) {
+            const report = appState.reports.find(r => r.id === appState.activeReportId);
+            if(report) {
+                report.time = newTime;
+                updateReportSelector();
+                renderRightPanel();
+            }
+        }
+
+        // --- 5. ARAYÜZ GÜNCELLEME (STATE -> UI) ---
+        function loadFormFromState() {
+            const report = appState.reports.find(r => r.id === appState.activeReportId);
+            if(!report) return;
+            
+            // Saat Güncelle
+            document.getElementById('report-time').value = report.time;
+
+            // Metin ve Checkbox Güncelle
+            textFields.forEach(f => {
+                const data = report.fields[f.id];
+                if(data) {
+                    document.getElementById('check-' + f.id).checked = data.checked;
+                    document.getElementById('in-' + f.id).value = data.value || '';
+                }
+            });
+
+            // İmaj Önizlemelerini Güncelle
+            imageCategories.forEach(cat => {
+                const previewContainer = document.getElementById(`preview-${cat.id}`);
+                const dropZone = document.getElementById(`dropzone-${cat.id}`);
+                const zoneText = document.getElementById(`zonetext-${cat.id}`);
+                
+                // HATA BURADAN KAYNAKLANIYORDU: Eski PDF'lerde bu veri yoksa boş bir dizi (`[]`) kabul et.
+                const images = report.images[cat.id] || [];
+                
+                previewContainer.innerHTML = '';
+                
+                if (images.length > 0) {
+                    dropZone.classList.add('has-image');
+                    zoneText.innerHTML = `<strong>${images.length} görsel eklendi.</strong><br>Daha fazla eklemek için tıkla/yapıştır.`;
+                    
+                    images.forEach((imgBase64, index) => {
+                        const thumbWrapper = document.createElement('div');
+                        thumbWrapper.className = 'thumbnail-wrapper';
+                        
+                        const thumbImg = document.createElement('img');
+                        thumbImg.src = imgBase64;
+                        
+                        const btnRemoveSingle = document.createElement('button');
+                        btnRemoveSingle.className = 'btn-remove-single';
+                        btnRemoveSingle.innerHTML = '✕';
+                        btnRemoveSingle.addEventListener('click', (ev) => {
+                            ev.stopPropagation();
+                            report.images[cat.id].splice(index, 1);
+                            loadFormFromState(); 
+                            renderRightPanel();  
+                        });
+                        
+                        thumbWrapper.appendChild(thumbImg);
+                        thumbWrapper.appendChild(btnRemoveSingle);
+                        previewContainer.appendChild(thumbWrapper);
+                    });
+                } else {
+                    dropZone.classList.remove('has-image');
+                    zoneText.innerHTML = `${cat.label}<br>(Tıkla, Çoklu Seç veya Yapıştır)`;
+                }
+            });
+        }
+
+        function processFile(file, catId) {
+            if (!file.type.startsWith('image/')) { alert("Sadece görsel eklenebilir."); return; }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const report = appState.reports.find(r => r.id === appState.activeReportId);
+                if(report) {
+                    if(!report.images[catId]) report.images[catId] = [];
+                    report.images[catId].push(e.target.result);
+                    loadFormFromState();
+                    renderRightPanel();
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // --- 6. SAĞ PANEL DİNAMİK OLUŞTURMA ---
+        function renderRightPanel() {
+            const container = document.getElementById('dynamic-reports-container');
+            container.innerHTML = ''; 
+            
+            appState.reports.forEach((report) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'report-instance';
+                
+                // Saat Başlığı
+                const timeH3 = document.createElement('h3');
+                timeH3.className = 'time-header';
+                timeH3.innerHTML = `⏱ Rapor Saati: ${report.time || '--:--'}`;
+                wrapper.appendChild(timeH3);
+                
+                // Tablo
+                let hasVisibleRows = false;
+                let tbodyHtml = '';
+                textFields.forEach(f => {
+                    const fd = report.fields[f.id];
+                    if (fd && fd.checked) {
+                        hasVisibleRows = true;
+                        tbodyHtml += `<tr><td>${f.label}</td><td>${fd.value || '-'}</td></tr>`;
+                    }
+                });
+                
+                if (hasVisibleRows) {
+                    const table = document.createElement('table');
+                    table.className = 'report-table';
+                    table.innerHTML = `<thead><tr><th>Subjects</th><th>Explanatıon</th></tr></thead><tbody>${tbodyHtml}</tbody>`;
+                    wrapper.appendChild(table);
+                }
+                
+                // Ekran Görüntüleri
+                const screensDiv = document.createElement('div');
+                screensDiv.className = 'report-screenshots';
+                imageCategories.forEach(cat => {
+                    const images = report.images[cat.id];
+                    if (images && images.length > 0) {
+                        const section = document.createElement('div');
+                        section.className = 'screenshot-item';
+                        section.innerHTML = `<h4>${cat.label}</h4>`;
+                        const imgWrapper = document.createElement('div');
+                        images.forEach(imgBase64 => {
+                            const img = document.createElement('img');
+                            img.src = imgBase64;
+                            imgWrapper.appendChild(img);
+                        });
+                        section.appendChild(imgWrapper);
+                        screensDiv.appendChild(section);
+                    }
+                });
+                wrapper.appendChild(screensDiv);
+                
+                container.appendChild(wrapper);
+            });
+        }
+
+        // --- 7. PDF KAYDETME VE GERİ YÜKLEME ---
+        function generatePDF() {
+            const loader = document.getElementById('loader');
+            loader.style.display = 'block'; 
+            
+            const element = document.getElementById('report-content');
+            const dateStr = new Date().toISOString().slice(0, 10);
+            
+            // Tüm state'i (çoklu raporları) JSON olarak tut
+            const rootData = { reports: appState.reports };
+            
+            const opt = {
+                margin:       0, 
+                filename:     `TRB_Bridge_Daily_Report_${dateStr}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).toPdf().get('pdf').then(function (pdf) {
+                const pdfBlob = pdf.output('blob');
+                const metadataStr = "\n###TRB_BRIDGE_DATA_START###\n" + JSON.stringify(rootData) + "\n###TRB_BRIDGE_DATA_END###\n";
+                const metaBlob = new Blob([metadataStr], { type: 'text/plain' });
+                const finalBlob = new Blob([pdfBlob, metaBlob], { type: 'application/pdf' });
+                
+                const url = URL.createObjectURL(finalBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = opt.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                loader.style.display = 'none';
+            }).catch(err => {
+                console.error(err);
+                alert("PDF oluşturulurken bir hata meydana geldi.");
+                loader.style.display = 'none';
+            });
+        }
+
+        function handlePDFUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const arrayBuffer = e.target.result;
+                const view = new Uint8Array(arrayBuffer);
+                const decoder = new TextDecoder("utf-8");
+                const text = decoder.decode(view);
+
+                const startMarker = "###TRB_BRIDGE_DATA_START###";
+                const endMarker = "###TRB_BRIDGE_DATA_END###";
+                
+                const startIndex = text.lastIndexOf(startMarker);
+                const endIndex = text.lastIndexOf(endMarker);
+                
+                if (startIndex !== -1 && endIndex !== -1) {
+                    const jsonStr = text.substring(startIndex + startMarker.length, endIndex).trim();
+                    try {
+                        const parsedData = JSON.parse(jsonStr);
+                        
+                        // Yeni formattaki çoklu rapor mu, yoksa eski formattaki tekil rapor mu kontrol et
+                        if (parsedData.reports) {
+                            appState.reports = parsedData.reports;
+                            appState.nextId = Math.max(...appState.reports.map(r => r.id)) + 1;
+                        } else {
+                            // ESKİ VERSİYON PDF UYUMLULUĞU - DÜZELTİLDİ
+                            // Boş bir tam formatlı rapor oluştur
+                            const migrated = createNewReportObject(1);
+                            
+                            // Yüklenen verileri tam şablona güvenli bir şekilde aktar
+                            if (parsedData.fields) {
+                                Object.keys(parsedData.fields).forEach(key => {
+                                    if(migrated.fields[key]) {
+                                        migrated.fields[key] = parsedData.fields[key];
+                                    }
+                                });
+                            }
+                            if (parsedData.images) {
+                                Object.keys(parsedData.images).forEach(key => {
+                                    if(migrated.images[key]) {
+                                        migrated.images[key] = parsedData.images[key];
+                                    }
+                                });
+                            }
+                            
+                            appState.reports = [migrated];
+                            appState.nextId = 2;
+                        }
+                        
+                        appState.activeReportId = appState.reports[0].id;
+                        updateReportSelector();
+                        loadFormFromState();
+                        renderRightPanel();
+                        alert("Tüm rapor verileri başarıyla yüklendi!");
+                        
+                    } catch(err) {
+                        console.error("PDF Yükleme Hatası:", err);
+                        alert("PDF içindeki veri formatı bozuk veya okunamadı.");
+                    }
+                } else {
+                    alert("Bu PDF düzenlenebilir bir veri içermiyor.");
+                }
+                event.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>

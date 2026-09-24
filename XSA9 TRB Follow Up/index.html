@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRB Follow Up - Gelişmiş Vardiya Raporu</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {} }
+        }
+    </script>
+    <!-- ExcelJS & FileSaver -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #9ca3af; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #4b5563; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        #drawCanvas { cursor: crosshair; touch-action: none; }
+        
+        /* Drag and drop efektleri */
+        .dragging { opacity: 0.4; scale: 0.98; }
+        .drag-over { border: 2px dashed #3b82f6 !important; }
+    </style>
+</head>
+<body class="h-screen flex flex-col font-sans relative bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+
+    <!-- Üst Menü -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center shadow-sm z-10 transition-colors duration-200">
+        <div>
+            <h1 class="text-2xl font-bold text-blue-600 dark:text-blue-400"><i class="fas fa-bolt mr-2 text-yellow-500"></i>TRB Otomatik Rapor Paneli</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Ekran görüntüsünü yapıştırın (Ctrl+V) veya ham veri ekleyin.</p>
+        </div>
+        
+        <div class="flex items-center gap-4">
+            <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1 border border-gray-300 dark:border-gray-600">
+                <i class="far fa-calendar-alt text-gray-500 dark:text-gray-400 ml-2 mr-2"></i>
+                <input type="date" id="shiftDate" onchange="updateSettings('date', this.value)" class="bg-transparent border-none text-gray-800 dark:text-white px-2 py-1 outline-none text-sm font-medium cursor-pointer">
+            </div>
+
+            <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1 border border-gray-300 dark:border-gray-600">
+                <i class="fas fa-clock text-gray-500 dark:text-gray-400 ml-2 mr-2"></i>
+                <select id="shiftSelect" onchange="updateSettings('shift', this.value)" class="bg-transparent border-none text-gray-800 dark:text-white px-2 py-1 outline-none text-sm font-medium cursor-pointer">
+                    <option value="07:00-15:00">07:00 - 15:00</option>
+                    <option value="15:00-23:00">15:00 - 23:00</option>
+                    <option value="23:00-07:00">23:00 - 07:00</option>
+                    <option value="07:00-19:00">07:00 - 19:00</option>
+                    <option value="19:00-07:00">19:00 - 07:00</option>
+                </select>
+            </div>
+            
+            <button onclick="toggleTheme()" class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-yellow-400 hover:bg-gray-300 transition" title="Tema Değiştir">
+                <i class="fas fa-sun" id="themeIcon"></i>
+            </button>
+            
+            <div class="h-8 w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
+            
+            <button onclick="clearAll()" class="bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 px-4 py-2 rounded transition text-sm font-medium border border-red-200 dark:border-red-800/50">
+                <i class="fas fa-trash-alt mr-1"></i> Temizle
+            </button>
+            
+            <!-- JSON İçe Aktar -->
+            <label class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded shadow-md transition text-sm font-bold flex items-center cursor-pointer">
+                <i class="fas fa-file-import mr-2"></i> İçe Aktar
+                <input type="file" accept=".json" class="hidden" onchange="importFromJson(event)">
+            </label>
+            
+            <!-- JSON Dışa Aktar -->
+            <button onclick="exportToJson()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded shadow-md transition text-sm font-bold flex items-center">
+                <i class="fas fa-file-export mr-2"></i> Dışa Aktar
+            </button>
+            
+            <!-- Excel Çıktısı -->
+            <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded shadow-md transition text-sm font-bold flex items-center">
+                <i class="fas fa-file-excel mr-2 text-lg"></i> Excel
+            </button>
+        </div>
+    </header>
+
+    <!-- Ana İçerik -->
+    <main class="flex-1 overflow-hidden flex flex-col relative">
+        
+        <!-- Üst Dashboard -->
+        <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex gap-6 shrink-0 z-0">
+            <!-- Genel Not -->
+            <div class="w-1/3 flex flex-col">
+                <label class="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1"><i class="fas fa-sticky-note mr-1"></i> Vardiya Genel Notu (Excel İlk Sayfa)</label>
+                <textarea id="generalNote" onchange="updateSettings('generalNote', this.value)" class="flex-1 min-h-[60px] bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded p-2 text-sm outline-none focus:border-blue-500 resize-none" placeholder="Vardiya ile ilgili genel durum özetini buraya yazın..."></textarea>
+            </div>
+
+            <!-- İstatistik & Oransal Zaman Çizelgesi -->
+            <div class="w-2/3 flex flex-col justify-between">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Vardiya Özeti & Zaman Çizelgesi</span>
+                    <div id="dashboardStats" class="flex gap-2 text-xs font-semibold">
+                        <!-- JS ile doldurulacak -->
+                    </div>
+                </div>
+                
+                <!-- Oransal Isı Haritası Barı -->
+                <div class="relative h-6 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden flex border border-gray-300 dark:border-gray-600 shadow-inner" id="timelineBar">
+                    <!-- JS ile bölümler eklenecek -->
+                </div>
+                <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono" id="timelineLabels">
+                    <!-- Saat etiketleri -->
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-1 overflow-hidden">
+            <!-- Sol Panel -->
+            <div class="w-1/4 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 p-4 flex flex-col transition-colors duration-200">
+                <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4 border-b border-gray-200 dark:border-gray-800 pb-2">Saat Dilimleri</h2>
+                <div id="hourList" class="flex flex-col gap-2 overflow-y-auto pr-2 pb-10">
+                    <!-- Saatler JS ile eklenecek -->
+                </div>
+            </div>
+
+            <!-- Sağ Panel -->
+            <div class="w-3/4 bg-gray-50 dark:bg-gray-800 p-6 flex flex-col relative transition-colors duration-200 overflow-hidden" id="contentPanel">
+                
+                <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+                    <div class="bg-white dark:bg-gray-900 p-10 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-xl text-center border-dashed">
+                        <i class="fas fa-clipboard text-5xl mb-4 text-blue-500 opacity-80"></i>
+                        <h3 class="text-xl font-bold text-gray-700 dark:text-gray-300 mb-2">Başlamak İçin Yapıştır</h3>
+                        <p class="text-sm">Panodaki görüntüyü sayfaya yapıştırın (Ctrl+V).</p>
+                    </div>
+                </div>
+
+                <div id="activeContent" class="h-full flex flex-col hidden">
+                    <div class="flex justify-between items-center mb-4 pb-2 border-b border-gray-300 dark:border-gray-700 shrink-0">
+                        <h2 class="text-2xl font-bold text-blue-600 dark:text-blue-400" id="activeHourTitle"></h2>
+                        <span class="text-gray-500 dark:text-gray-400 text-sm font-medium" id="itemCountLabel"></span>
+                    </div>
+                    
+                    <div id="itemsGrid" ondragover="handleContainerDragOver(event)" class="flex-1 overflow-y-auto grid grid-cols-1 xl:grid-cols-2 gap-6 content-start pr-2 pb-10">
+                        <!-- Kartlar buraya eklenecek -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Canvas -->
+    <div id="pasteModal" class="fixed inset-0 bg-gray-900/80 flex items-center justify-center hidden z-50 backdrop-blur-sm transition-opacity">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-4xl border border-gray-200 dark:border-gray-700 flex flex-col max-h-[90vh]">
+            <div class="flex items-center justify-between mb-4 shrink-0">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white"><i class="fas fa-crop-alt mr-2 text-blue-500"></i>Görüntü İşleme (Çizim Yapabilirsiniz)</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            
+            <div class="flex-1 relative bg-gray-100 dark:bg-black rounded border border-gray-300 dark:border-gray-700 overflow-auto flex items-center justify-center shadow-inner mb-4" id="canvasContainer">
+                <div class="relative shadow-lg" style="display: inline-block;">
+                    <canvas id="drawCanvas" class="bg-transparent touch-none rounded"></canvas>
+                </div>
+            </div>
+            
+            <div class="shrink-0 grid grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Çizim Araçları</label>
+                    <div class="flex gap-2">
+                        <button onclick="clearCanvas()" class="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition"><i class="fas fa-undo mr-1"></i> Çizimi Temizle</button>
+                        <span class="text-xs text-gray-500 self-center ml-2">İşaretlemek için fareyle sürükleyin.</span>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zaman ve Durum</label>
+                    <div class="flex gap-3">
+                        <input type="time" id="modalTime" class="w-1/2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded p-2 outline-none" required>
+                        <select id="modalStatus" class="w-1/2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded p-2 outline-none">
+                            <option value="info">🔵 BİLGİ</option>
+                            <option value="warning">🟡 UYARI</option>
+                            <option value="action">🟣 AKSİYON</option>
+                            <option value="critical">🔴 KRİTİK</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6 shrink-0 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="closeModal()" class="px-5 py-2.5 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white rounded-lg font-medium transition hover:bg-gray-300">İptal</button>
+                <button onclick="savePastedItem()" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-bold transition shadow-lg hover:bg-blue-700">Rapor Kartı Oluştur</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hızlı Şablonlar -->
+    <script>
+        const SNIPPETS = [
+            "Kapasite darboğazı yaşanıyor.",
+            "Personel eksikliği mevcut.",
+            "Sistem yavaşlığı bildirildi.",
+            "CPT riski bulunmuyor.",
+            "Yöneticilere bilgi verildi."
+        ];
+    </script>
+
+    <!-- IndexedDB & Script Logic -->
+    <script>
+        const DB_NAME = 'TRB_DB';
+        const DB_VERSION = 1;
+        let db;
+        
+        let state = {
+            items: [],
+            shiftDate: new Date().toISOString().split('T')[0],
+            currentShift: '15:00-23:00',
+            generalNote: ''
+        };
+        
+        let activeRange = null;
+        let draggedItemId = null;
+        let autoScrollInterval = null;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = (e) => {
+                    db = e.target.result;
+                    if(!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+                    if(!db.objectStoreNames.contains('items')) db.createObjectStore('items', { keyPath: 'id' });
+                };
+                req.onsuccess = (e) => { db = e.target.result; resolve(); };
+                req.onerror = (e) => reject(e);
+            });
+        }
+
+        function dbGet(store, key) {
+            return new Promise((resolve) => {
+                const tx = db.transaction(store, 'readonly');
+                const req = key ? tx.objectStore(store).get(key) : tx.objectStore(store).getAll();
+                req.onsuccess = e => resolve(e.target.result);
+                req.onerror = () => resolve(key ? null : []);
+            });
+        }
+
+        function dbPut(store, value, key) {
+            return new Promise((resolve) => {
+                const tx = db.transaction(store, 'readwrite');
+                key ? tx.objectStore(store).put(value, key) : tx.objectStore(store).put(value);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        function dbDelete(store, key) {
+            return new Promise((resolve) => {
+                const tx = db.transaction(store, 'readwrite');
+                tx.objectStore(store).delete(key);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        function dbClear(store) {
+            return new Promise((resolve) => {
+                const tx = db.transaction(store, 'readwrite');
+                tx.objectStore(store).clear();
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        async function loadState() {
+            const savedDate = await dbGet('settings', 'shiftDate');
+            const savedShift = await dbGet('settings', 'currentShift');
+            const savedNote = await dbGet('settings', 'generalNote');
+            
+            if(savedDate) state.shiftDate = savedDate;
+            if(savedShift) state.currentShift = savedShift;
+            if(savedNote) state.generalNote = savedNote;
+            
+            document.getElementById('shiftDate').value = state.shiftDate;
+            document.getElementById('shiftSelect').value = state.currentShift;
+            document.getElementById('generalNote').value = state.generalNote;
+
+            const savedItems = await dbGet('items');
+            state.items = savedItems || [];
+            
+            applyTheme();
+            render();
+        }
+
+        async function updateSettings(key, value) {
+            state[key] = value;
+            await dbPut('settings', value, key);
+            if(key === 'shift') render(); 
+        }
+
+        /* --- Dosya İsimlendirme Formatı: TRB Follow Up (23-9-2026) - 15-23 --- */
+        function getExportFileName(extension) {
+            if (!state.shiftDate) return `TRB Follow Up.${extension}`;
+            
+            const parts = state.shiftDate.split('-'); // YYYY-MM-DD
+            const year = parts[0];
+            const month = parseInt(parts[1], 10);
+            const day = parseInt(parts[2], 10);
+            const formattedDate = `${day}-${month}-${year}`;
+            
+            const formattedShift = (state.currentShift || '').replace(/:00/g, '');
+            
+            return `TRB Follow Up (${formattedDate}) - ${formattedShift}.${extension}`;
+        }
+
+        /* --- Renkli Excel Durum Rozeti Görseli Oluşturucu (Canvas) --- */
+        function generateStatusBadgeBase64(status) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 180;
+            canvas.height = 40;
+            const ctx = canvas.getContext('2d');
+
+            let mainColor = '#3b82f6';
+            let lightColor = '#93c5fd';
+            let darkColor = '#1d4ed8';
+            let text = 'BİLGİ';
+
+            if (status === 'critical') {
+                mainColor = '#ef4444'; lightColor = '#fca5a5'; darkColor = '#b91c1c'; text = 'KRİTİK';
+            } else if (status === 'action') {
+                mainColor = '#a855f7'; lightColor = '#d8b4fe'; darkColor = '#6b21a8'; text = 'AKSİYON';
+            } else if (status === 'warning') {
+                mainColor = '#f59e0b'; lightColor = '#fde68a'; darkColor = '#b45309'; text = 'UYARI';
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const cx = 22, cy = 20, r = 11;
+            const grad = ctx.createRadialGradient(cx - 3, cy - 4, 1, cx, cy, r);
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(0.3, lightColor);
+            grad.addColorStop(0.7, mainColor);
+            grad.addColorStop(1, darkColor);
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 16px Calibri, Arial, sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 44, 21);
+
+            return canvas.toDataURL('image/png');
+        }
+
+        /* Shift & Time Helpers */
+        function getShiftStartHour() { return parseInt(state.currentShift.split('-')[0].split(':')[0], 10); }
+        function getShiftEndHour() { return parseInt(state.currentShift.split('-')[1].split(':')[0], 10); }
+
+        function timeToMinutes(timeStr) {
+            let [h, m] = timeStr.split(':').map(Number);
+            const startHour = getShiftStartHour();
+            const endHour = getShiftEndHour();
+            const crossesMidnight = endHour <= startHour;
+            
+            if (crossesMidnight && h < startHour) h += 24;
+            return (h * 60) + m;
+        }
+
+        function generateShiftIntervals() {
+            const intervals = [];
+            let start = getShiftStartHour();
+            let end = getShiftEndHour();
+            let current = start;
+            let limit = (end <= start) ? end + 24 : end;
+
+            while(current < limit) {
+                let actualH = current % 24;
+                let nextH = (current + 1) % 24;
+                const pad = (num) => num.toString().padStart(2, '0');
+                intervals.push(`${pad(actualH)}:00 - ${pad(nextH)}:00`);
+                current++;
+            }
+            return intervals;
+        }
+
+        function calculateRange(timeStr) {
+            let [h, m] = timeStr.split(':').map(Number);
+            let nextH = (h + 1) % 24;
+            let pad = (n) => n.toString().padStart(2, '0');
+            return `${pad(h)}:00 - ${pad(nextH)}:00`;
+        }
+
+        async function clearAll() {
+            if(confirm("Tüm vardiya verilerini kalıcı olarak silmek istediğinize emin misiniz?")) {
+                state.items = [];
+                state.generalNote = '';
+                document.getElementById('generalNote').value = '';
+                activeRange = null;
+                await dbClear('items');
+                await dbPut('settings', '', 'generalNote');
+                render();
+            }
+        }
+
+        /* SAAT GÜNCELLEME SÜRECİ */
+        function updateItemTime(id, value) {
+            const idx = state.items.findIndex(i => i.id === id);
+            if(idx > -1) {
+                state.items[idx].time = value;
+                state.items[idx].range = calculateRange(value);
+                dbPut('items', state.items[idx]);
+            }
+        }
+
+        async function finishTimeEdit() {
+            state.items.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+            for (let item of state.items) {
+                await dbPut('items', item);
+            }
+            render();
+        }
+
+        async function updateItemData(id, field, value) {
+            const idx = state.items.findIndex(i => i.id === id);
+            if(idx > -1) {
+                state.items[idx][field] = value;
+                await dbPut('items', state.items[idx]);
+                render();
+            }
+        }
+
+        async function deleteItem(id) {
+            if(confirm("Bu kartı silmek istiyor musunuz?")) {
+                state.items = state.items.filter(i => i.id !== id);
+                await dbDelete('items', id);
+                render();
+            }
+        }
+
+        async function insertSnippet(id, text) {
+            const idx = state.items.findIndex(i => i.id === id);
+            const currentNote = state.items[idx].note || "";
+            const newNote = currentNote ? currentNote + "\n" + text : text;
+            state.items[idx].note = newNote;
+            await dbPut('items', state.items[idx]);
+            document.getElementById(`note-${id}`).value = newNote;
+        }
+
+        /* --- Sürükle, Bırak ve Otomatik Kaydırma (Auto-Scroll) --- */
+        function handleDragStart(e, id) {
+            draggedItemId = id;
+            e.dataTransfer.effectAllowed = 'move';
+            e.target.classList.add('dragging');
+        }
+
+        function handleContainerDragOver(e) {
+            e.preventDefault();
+            const grid = document.getElementById('itemsGrid');
+            if (!grid) return;
+
+            const rect = grid.getBoundingClientRect();
+            const edgeThreshold = 80;
+            const scrollSpeed = 16;
+
+            if (e.clientY < rect.top + edgeThreshold) {
+                startAutoScroll(grid, -scrollSpeed);
+            } else if (e.clientY > rect.bottom - edgeThreshold) {
+                startAutoScroll(grid, scrollSpeed);
+            } else {
+                stopAutoScroll();
+            }
+        }
+
+        function startAutoScroll(container, speed) {
+            if (!autoScrollInterval) {
+                autoScrollInterval = setInterval(() => {
+                    container.scrollTop += speed;
+                }, 16);
+            }
+        }
+
+        function stopAutoScroll() {
+            if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+            }
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const card = e.currentTarget;
+            card.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        async function handleDrop(e, targetId) {
+            e.preventDefault();
+            stopAutoScroll();
+            e.currentTarget.classList.remove('drag-over');
+            if (!draggedItemId || draggedItemId === targetId) return;
+
+            const fromIdx = state.items.findIndex(i => i.id === draggedItemId);
+            const toIdx = state.items.findIndex(i => i.id === targetId);
+
+            if (fromIdx > -1 && toIdx > -1) {
+                const [movedItem] = state.items.splice(fromIdx, 1);
+                state.items.splice(toIdx, 0, movedItem);
+
+                for (let item of state.items) {
+                    await dbPut('items', item);
+                }
+                render();
+            }
+        }
+
+        function handleDragEnd(e) {
+            stopAutoScroll();
+            e.target.classList.remove('dragging');
+            draggedItemId = null;
+        }
+
+        function addExtraImages(id, inputElem) {
+            const files = inputElem.files;
+            if(!files.length) return;
+            const idx = state.items.findIndex(i => i.id === id);
+            
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const resized = await resizeImage(e.target.result);
+                    state.items[idx].images.push(resized);
+                    await dbPut('items', state.items[idx]);
+                    render();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function removeExtraImage(id, imgIndex) {
+            if(confirm("Bu görseli silmek istediğinize emin misiniz?")) {
+                const idx = state.items.findIndex(i => i.id === id);
+                state.items[idx].images.splice(imgIndex, 1);
+                await dbPut('items', state.items[idx]);
+                render();
+            }
+        }
+
+        /* Canvas & Clipboard */
+        let canvas, ctx, originalImgData;
+        let isDrawing = false;
+
+        window.addEventListener('paste', (e) => {
+            if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') return;
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file') {
+                    const blob = item.getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        const resizedBase64 = await resizeImage(event.target.result);
+                        initCanvas(resizedBase64);
+                        
+                        const now = new Date();
+                        document.getElementById('modalTime').value = now.toTimeString().substring(0,5);
+                        document.getElementById('modalStatus').value = 'info';
+                        document.getElementById('pasteModal').classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        });
+
+        function initCanvas(base64Str) {
+            canvas = document.getElementById('drawCanvas');
+            ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                originalImgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                const container = document.getElementById('canvasContainer');
+                const scale = Math.min(1, container.clientWidth / img.width, container.clientHeight / img.height);
+                canvas.style.transform = `scale(${scale})`;
+                canvas.style.transformOrigin = 'top center';
+            };
+            img.src = base64Str;
+            setupCanvasDrawing();
+        }
+
+        function setupCanvasDrawing() {
+            canvas.onmousedown = (e) => startDraw(e);
+            canvas.onmousemove = (e) => draw(e);
+            window.onmouseup = () => stopDraw();
+            
+            canvas.ontouchstart = (e) => { e.preventDefault(); startDraw(e.touches[0]); };
+            canvas.ontouchmove = (e) => { e.preventDefault(); draw(e.touches[0]); };
+            window.ontouchend = () => stopDraw();
+        }
+
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+        }
+
+        function startDraw(e) {
+            isDrawing = true;
+            const pos = getMousePos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const pos = getMousePos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        function stopDraw() { if (isDrawing) { ctx.closePath(); isDrawing = false; } }
+        function clearCanvas() { if(ctx && originalImgData) ctx.putImageData(originalImgData, 0, 0); }
+        function closeModal() { document.getElementById('pasteModal').classList.add('hidden'); }
+
+        async function savePastedItem() {
+            const timeVal = document.getElementById('modalTime').value;
+            const statusVal = document.getElementById('modalStatus').value;
+            if(!timeVal) { alert("Lütfen saati girin."); return; }
+            
+            const finalImage = canvas.toDataURL('image/png', 1.0);
+            const range = calculateRange(timeVal);
+            
+            const newItem = {
+                id: Date.now(),
+                time: timeVal,
+                range: range,
+                images: [finalImage],
+                note: '',
+                status: statusVal
+            };
+            
+            state.items.push(newItem);
+            state.items.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+            
+            for (let item of state.items) {
+                await dbPut('items', item);
+            }
+
+            closeModal();
+            activeRange = range;
+            render();
+        }
+
+        function setActive(range) {
+            activeRange = range;
+            render();
+        }
+
+        /* --- Render Logic --- */
+        function render() {
+            renderDashboardTimeline();
+            
+            const hourList = document.getElementById('hourList');
+            const itemsGrid = document.getElementById('itemsGrid');
+            const emptyState = document.getElementById('emptyState');
+            const activeContent = document.getElementById('activeContent');
+            const activeHourTitle = document.getElementById('activeHourTitle');
+            const itemCountLabel = document.getElementById('itemCountLabel');
+
+            const standardIntervals = generateShiftIntervals();
+
+            const grouped = {};
+            standardIntervals.forEach(r => grouped[r] = []);
+            state.items.forEach(item => {
+                if(!grouped[item.range]) grouped[item.range] = [];
+                grouped[item.range].push(item);
+            });
+
+            const allRanges = Object.keys(grouped).sort((a, b) => timeToMinutes(a.substring(0,5)) - timeToMinutes(b.substring(0,5)));
+            if (!activeRange || !grouped[activeRange]) activeRange = allRanges[0];
+
+            hourList.innerHTML = '';
+            allRanges.forEach(range => {
+                const rangeItems = grouped[range];
+                const isActive = range === activeRange;
+                
+                if(rangeItems.length > 0 || standardIntervals.includes(range)) {
+                    const hasCritical = rangeItems.some(i => i.status === 'critical');
+                    const hasAction = rangeItems.some(i => i.status === 'action');
+                    
+                    let bgClass = isActive ? 'bg-blue-50 border-blue-500 shadow-md dark:bg-blue-900/60 dark:border-blue-400' 
+                                           : 'bg-white border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700';
+                    let textClass = isActive ? 'text-blue-700 dark:text-blue-200 font-bold' : 'text-gray-700 dark:text-gray-300 font-medium';
+                    
+                    let badgeClass = 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400';
+                    if (rangeItems.length > 0) {
+                        if (hasCritical) badgeClass = 'bg-red-500 text-white';
+                        else if (hasAction) badgeClass = 'bg-purple-600 text-white';
+                        else badgeClass = 'bg-blue-600 text-white';
+                    }
+
+                    const div = document.createElement('div');
+                    div.className = `p-3 rounded-xl cursor-pointer flex justify-between items-center border transition-all duration-200 ${bgClass}`;
+                    div.onclick = () => setActive(range);
+                    div.innerHTML = `
+                        <div class="flex items-center ${textClass}">
+                            <i class="fas ${isActive ? 'fa-folder-open text-blue-500' : 'fa-folder text-gray-400'} mr-3 text-sm"></i>
+                            ${range}
+                        </div>
+                        <span class="${badgeClass} text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">
+                            ${rangeItems.length}
+                        </span>
+                    `;
+                    hourList.appendChild(div);
+                }
+            });
+
+            if (activeRange && grouped[activeRange] && grouped[activeRange].length > 0) {
+                emptyState.classList.add('hidden');
+                activeContent.classList.remove('hidden');
+                activeHourTitle.textContent = activeRange;
+                itemCountLabel.textContent = `${grouped[activeRange].length} İşlem Kaydı`;
+                itemsGrid.innerHTML = '';
+                
+                const currentCards = grouped[activeRange];
+
+                currentCards.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 flex flex-col shadow hover:shadow-lg transition-all duration-150 cursor-grab active:cursor-grabbing";
+                    card.draggable = true;
+                    card.ondragstart = (e) => handleDragStart(e, item.id);
+                    card.ondragover = (e) => handleDragOver(e);
+                    card.ondragleave = (e) => handleDragLeave(e);
+                    card.ondrop = (e) => handleDrop(e, item.id);
+                    card.ondragend = (e) => handleDragEnd(e);
+
+                    const imagesHtml = item.images.map((img, idx) => `
+                        <div class="relative group w-full mb-2 border border-gray-300 dark:border-gray-600 rounded">
+                            <!-- Tıklama özelliği ve cursor eklendi -->
+                            <img src="${img}" class="w-full h-auto object-contain rounded cursor-zoom-in" alt="Kayıt" onclick="openLightbox('${img}')">
+                            <button onclick="removeExtraImage(${item.id}, ${idx})" class="absolute top-2 right-2 bg-red-600/80 hover:bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition z-10"><i class="fas fa-times"></i></button>
+                        </div>
+                    `).join('');
+
+                    const snippetsHtml = SNIPPETS.map(snip => `
+                        <button onclick="insertSnippet(${item.id}, '${snip}')" class="whitespace-nowrap px-2 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 text-xs rounded text-gray-700 dark:text-gray-300 transition shrink-0">
+                            + ${snip.split(' ')[0]}...
+                        </button>
+                    `).join('');
+
+                    card.innerHTML = `
+                        <div class="flex-none bg-gray-50 dark:bg-gray-800 p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                            <div class="flex items-center gap-2 w-full pr-2">
+                                <i class="fas fa-grip-vertical text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 mr-1 text-base cursor-grab" title="Sürükleyip Yer Değiştir"></i>
+                                
+                                <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded flex items-center px-2 shadow-sm">
+                                    <i class="far fa-clock text-blue-500 text-sm"></i>
+                                    <input type="time" value="${item.time}" onchange="updateItemTime(${item.id}, this.value)" onblur="finishTimeEdit()" class="bg-transparent border-none text-blue-600 dark:text-blue-300 font-mono text-sm py-1 ml-1 outline-none w-20 cursor-pointer">
+                                </div>
+                                
+                                <select onchange="updateItemData(${item.id}, 'status', this.value)" class="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm outline-none font-bold cursor-pointer">
+                                    <option value="info" ${item.status === 'info' ? 'selected' : ''}>🔵 BİLGİ</option>
+                                    <option value="warning" ${item.status === 'warning' ? 'selected' : ''}>🟡 UYARI</option>
+                                    <option value="action" ${item.status === 'action' ? 'selected' : ''}>🟣 AKSİYON</option>
+                                    <option value="critical" ${item.status === 'critical' ? 'selected' : ''}>🔴 KRİTİK</option>
+                                </select>
+                                
+                                <div class="ml-auto">
+                                    <label class="cursor-pointer bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs px-3 py-1.5 rounded font-bold transition flex items-center shadow-sm">
+                                        <i class="fas fa-plus mr-1"></i> Görsel
+                                        <input type="file" multiple accept="image/*" class="hidden" onchange="addExtraImages(${item.id}, this)">
+                                    </label>
+                                </div>
+                            </div>
+                            <button onclick="deleteItem(${item.id})" class="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded transition"><i class="fas fa-trash"></i></button>
+                        </div>
+                        
+                        <div class="flex-1 overflow-y-auto p-3 bg-gray-100 dark:bg-gray-900 min-h-[250px] max-h-[400px]">
+                            ${imagesHtml}
+                        </div>
+                        
+                        <div class="flex-none p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex flex-col gap-2">
+                            <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                                ${snippetsHtml}
+                            </div>
+                            <textarea id="note-${item.id}" onchange="updateItemData(${item.id}, 'note', this.value)" placeholder="Bu işlem için detayları girin..." class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm h-20 outline-none focus:border-blue-500 resize-none text-gray-800 dark:text-gray-200">${item.note}</textarea>
+                        </div>
+                    `;
+                    itemsGrid.appendChild(card);
+                });
+            } else if (state.items.length > 0 || standardIntervals.includes(activeRange)) {
+                emptyState.classList.add('hidden');
+                activeContent.classList.remove('hidden');
+                activeHourTitle.textContent = activeRange;
+                itemCountLabel.textContent = "0 İşlem Kaydı";
+                itemsGrid.innerHTML = `
+                    <div class="col-span-full flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600">
+                        <i class="fas fa-inbox text-5xl mb-4 opacity-30"></i>
+                        <p>Bu saat aralığı temiz.</p>
+                    </div>
+                `;
+            } else {
+                emptyState.classList.remove('hidden');
+                activeContent.classList.add('hidden');
+            }
+        }
+
+        /* --- Dashboard & Oransal Timeline Bar --- */
+        function renderDashboardTimeline() {
+            const statsDiv = document.getElementById('dashboardStats');
+            const barDiv = document.getElementById('timelineBar');
+            const labelsDiv = document.getElementById('timelineLabels');
+            
+            let crit = 0, warn = 0, act = 0, info = 0;
+            state.items.forEach(i => {
+                if(i.status === 'critical') crit++;
+                else if(i.status === 'action') act++;
+                else if(i.status === 'warning') warn++;
+                else info++;
+            });
+            
+            statsDiv.innerHTML = `
+                <span class="bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600">Total: <b>${state.items.length}</b></span>
+                <span class="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800">Bilgi: <b>${info}</b></span>
+                <span class="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800">Uyarı: <b>${warn}</b></span>
+                <span class="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 px-2.5 py-1 rounded-lg border border-purple-200 dark:border-purple-800">Aksiyon: <b>${act}</b></span>
+                <span class="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-800">Kritik: <b>${crit}</b></span>
+            `;
+
+            const intervals = generateShiftIntervals();
+            barDiv.innerHTML = '';
+            labelsDiv.innerHTML = '';
+            
+            intervals.forEach(inv => {
+                const startHourStr = inv.split('-')[0];
+                const itemsInInv = state.items.filter(i => i.range === inv);
+                
+                const seg = document.createElement('div');
+                seg.className = `flex-1 h-full border-r border-white dark:border-gray-800 last:border-0 hover:opacity-90 cursor-pointer transition flex overflow-hidden bg-gray-200 dark:bg-gray-700`;
+                seg.title = `${inv} - Toplam: ${itemsInInv.length} Kayıt`;
+                seg.onclick = () => setActive(inv);
+
+                if (itemsInInv.length === 0) {
+                    seg.innerHTML = `<div class="w-full h-full bg-gray-200 dark:bg-gray-700"></div>`;
+                } else {
+                    let segInfo = itemsInInv.filter(i => i.status === 'info').length;
+                    let segWarn = itemsInInv.filter(i => i.status === 'warning').length;
+                    let segAct = itemsInInv.filter(i => i.status === 'action').length;
+                    let segCrit = itemsInInv.filter(i => i.status === 'critical').length;
+                    let totalInInv = itemsInInv.length;
+
+                    let pctInfo = (segInfo / totalInInv) * 100;
+                    let pctWarn = (segWarn / totalInInv) * 100;
+                    let pctAct = (segAct / totalInInv) * 100;
+                    let pctCrit = (segCrit / totalInInv) * 100;
+
+                    let innerHtml = '';
+                    if (pctInfo > 0) innerHtml += `<div style="width: ${pctInfo}%" class="h-full bg-blue-500" title="Bilgi: ${segInfo}"></div>`;
+                    if (pctWarn > 0) innerHtml += `<div style="width: ${pctWarn}%" class="h-full bg-amber-500" title="Uyarı: ${segWarn}"></div>`;
+                    if (pctAct > 0) innerHtml += `<div style="width: ${pctAct}%" class="h-full bg-purple-600" title="Aksiyon: ${segAct}"></div>`;
+                    if (pctCrit > 0) innerHtml += `<div style="width: ${pctCrit}%" class="h-full bg-red-500" title="Kritik: ${segCrit}"></div>`;
+
+                    seg.innerHTML = innerHtml;
+                }
+                
+                barDiv.appendChild(seg);
+
+                const lbl = document.createElement('div');
+                lbl.className = 'flex-1 text-center';
+                lbl.textContent = startHourStr;
+                labelsDiv.appendChild(lbl);
+            });
+        }
+
+        /* --- Excel Export --- */
+        async function exportToExcel() {
+            if (state.items.length === 0 && !state.generalNote) {
+                alert("Dışa aktarılacak veri bulunamadı.");
+                return;
+            }
+
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'Vardiya Raporu Aracı';
+
+            const summarySheet = workbook.addWorksheet('GENEL ÖZET');
+            summarySheet.columns = [{ width: 100 }];
+            
+            const titleRow = summarySheet.getRow(1);
+            titleRow.getCell(1).value = `VARDİYA GENEL ÖZETİ (${state.shiftDate} | ${state.currentShift})`;
+            titleRow.font = { name: 'Calibri', bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+            titleRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1C2833' } };
+            titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
+            titleRow.height = 30;
+
+            const noteRow = summarySheet.getRow(3);
+            noteRow.getCell(1).value = state.generalNote || "Genel not girilmedi.";
+            noteRow.font = { name: 'Calibri', size: 12 };
+            noteRow.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+            noteRow.height = 150;
+
+            const grouped = {};
+            state.items.forEach(item => {
+                if(!grouped[item.range]) grouped[item.range] = [];
+                grouped[item.range].push(item);
+            });
+
+            const allRanges = Object.keys(grouped).sort((a,b) => timeToMinutes(a.substring(0,5)) - timeToMinutes(b.substring(0,5)));
+
+            for (const range of allRanges) {
+                const rangeItems = grouped[range];
+
+                const safeSheetName = range.replace(/:/g, '.').replace(/[/\\?*\[\]]/g, '-');
+                const worksheet = workbook.addWorksheet(safeSheetName);
+
+                worksheet.columns = [{ width: 18 }, { width: 115 }];
+                let currentRow = 1;
+
+                for (let i = 0; i < rangeItems.length; i++) {
+                    const item = rangeItems[i];
+                    if (i > 0) currentRow += 2;
+                    const cardStartRow = currentRow;
+
+                    // Row 1: İşlem Saati
+                    const r1 = worksheet.getRow(currentRow++);
+                    r1.height = 25;
+                    r1.getCell(1).value = "İŞLEM SAATİ";
+                    r1.getCell(2).value = item.time;
+                    formatCell(r1.getCell(1), true, 'FF1C2833', 'center');
+                    formatCell(r1.getCell(2), true, 'FF000000', 'left', false);
+
+                    // Row 2: Durum
+                    const r2 = worksheet.getRow(currentRow++);
+                    r2.height = 32;
+                    r2.getCell(1).value = "DURUM";
+                    r2.getCell(2).value = "";
+                    formatCell(r2.getCell(1), true, 'FF1C2833', 'center');
+                    formatCell(r2.getCell(2), false, 'FFFFFFFF', 'left', false);
+
+                    const badgeBase64 = generateStatusBadgeBase64(item.status);
+                    const badgeImgId = workbook.addImage({ base64: badgeBase64, extension: 'png' });
+                    worksheet.addImage(badgeImgId, {
+                        tl: { col: 1, row: currentRow - 2, nativeCellOffset: { x: 10 * 9525, y: 3 * 9525 } },
+                        ext: { width: 135, height: 30 },
+                        editAs: 'oneCell'
+                    });
+
+                    // İşlem Ekran Görüntüleri - Orijinal yüksek kalite korunuyor
+                    for (let imgIndex = 0; imgIndex < item.images.length; imgIndex++) {
+                        const imgData = item.images[imgIndex];
+                        const dimensions = await getImageDimensions(imgData);
+                        
+                        // Görsel orijinal yüksek çözünürlüğünde eklenir
+                        const targetWidthPx = Math.min(800, dimensions.width);
+                        const aspect = dimensions.height / dimensions.width;
+                        const targetHeightPx = targetWidthPx * aspect;
+                        const imgRowHeightPt = targetHeightPx * 0.95;
+
+                        const rImg = worksheet.getRow(currentRow++);
+                        rImg.height = imgRowHeightPt;
+                        rImg.getCell(1).value = `GÖRSEL ${imgIndex + 1}`;
+                        formatCell(rImg.getCell(1), true, 'FF1C2833', 'center');
+
+                        const extType = imgData.startsWith('data:image/png') ? 'png' : 'jpeg';
+                        const imageId = workbook.addImage({ base64: imgData, extension: extType });
+                        worksheet.addImage(imageId, {
+                            tl: { col: 1, row: currentRow - 2, nativeCellOffset: { x: 5 * 9525, y: 5 * 9525 } },
+                            ext: { width: targetWidthPx, height: targetHeightPx },
+                            editAs: 'oneCell'
+                        });
+                    }
+
+                    // Notlar
+                    const rNote = worksheet.getRow(currentRow++);
+                    rNote.height = 65;
+                    rNote.getCell(1).value = "NOTLAR";
+                    rNote.getCell(2).value = item.note || '';
+                    formatCell(rNote.getCell(1), true, 'FF1C2833', 'center');
+                    formatCell(rNote.getCell(2), false, 'FF000000', 'left', true);
+
+                    // Çerçeveler
+                    for (let r = cardStartRow; r < currentRow; r++) {
+                        for (let c = 1; c <= 2; c++) {
+                            let cellBorder = {
+                                top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                                left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                                right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+                            };
+                            if (r === cardStartRow) cellBorder.top = { style: 'thick', color: { argb: 'FF000000' } };
+                            if (r === currentRow - 1) cellBorder.bottom = { style: 'thick', color: { argb: 'FF000000' } };
+                            if (c === 1) cellBorder.left = { style: 'thick', color: { argb: 'FF000000' } };
+                            if (c === 2) cellBorder.right = { style: 'thick', color: { argb: 'FF000000' } };
+                            worksheet.getRow(r).getCell(c).border = cellBorder;
+                        }
+                    }
+                }
+            }
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            saveAs(new Blob([buffer]), getExportFileName('xlsx'));
+        }
+
+        function formatCell(cell, isBold, bgColorHex, alignH, wrap = false) {
+            cell.font = { name: 'Calibri', bold: isBold, size: 11, color: { argb: bgColorHex === 'FF1C2833' ? 'FFFFFFFF' : 'FF000000' } };
+            if (bgColorHex !== 'FF000000') {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColorHex } };
+            }
+            cell.alignment = { vertical: bgColorHex === 'FF1C2833' ? 'middle' : 'center', horizontal: alignH, wrapText: wrap, indent: 1 };
+        }
+
+        function resizeImage(base64Str, maxWidth = 2560) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width, h = img.height;
+                    if (w > maxWidth) { h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+                    const cvs = document.createElement('canvas');
+                    cvs.width = w; cvs.height = h;
+                    const ctx = cvs.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, w, h);
+                    resolve(cvs.toDataURL('image/png', 1.0));
+                };
+                img.src = base64Str;
+            });
+        }
+
+        function getImageDimensions(base64Str) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve({ width: img.width, height: img.height });
+                img.src = base64Str;
+            });
+        }
+
+        function applyTheme() {
+            const isDark = localStorage.getItem('trb_theme') === 'dark';
+            if (isDark) document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+            document.getElementById('themeIcon').className = isDark ? 'fas fa-moon' : 'fas fa-sun';
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('trb_theme', isDark ? 'dark' : 'light');
+            document.getElementById('themeIcon').className = isDark ? 'fas fa-moon' : 'fas fa-sun';
+        }
+
+        window.onload = async () => {
+            await initDB();
+            await loadState();
+        };
+        
+        /* --- Resim Görüntüleme (Lightbox) Fonksiyonları --- */
+        function openLightbox(imgSrc) {
+            document.getElementById('lightboxImg').src = imgSrc;
+            document.getElementById('imageLightbox').classList.remove('hidden');
+        }
+        
+        function closeLightbox(e) {
+            document.getElementById('imageLightbox').classList.add('hidden');
+            document.getElementById('lightboxImg').src = '';
+        }
+        
+        /* --- JSON Export (Dışa Aktar) --- */
+        function exportToJson() {
+            if (state.items.length === 0 && !state.generalNote) {
+                alert("Dışa aktarılacak veri bulunamadı.");
+                return;
+            }
+            
+            // Tüm state objesini (saat, notlar, resimler dahil) JSON formatına çeviriyoruz
+            const dataStr = JSON.stringify(state, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            
+            // Mevcut isimlendirme formatınızı kullanarak JSON indiriyoruz
+            const fileName = getExportFileName('json'); 
+            saveAs(blob, fileName);
+        }
+        
+        /* --- JSON Import (İçe Aktar) --- */
+        async function importFromJson(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+        
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const importedState = JSON.parse(e.target.result);
+                    
+                    // Temel JSON doğrulama
+                    if (importedState && Array.isArray(importedState.items)) {
+                        if (confirm("Mevcut ekrandaki veriler silinecek ve yüklediğiniz dosyadaki veriler aktarılacak. Emin misiniz?")) {
+                            // Global state'i güncelliyoruz
+                            state = importedState;
+                            
+                            // IndexedDB'yi temizleyip yeni verileri yazıyoruz
+                            await dbClear('items');
+                            for (let item of state.items) {
+                                await dbPut('items', item);
+                            }
+                            
+                            await dbPut('settings', state.shiftDate, 'shiftDate');
+                            await dbPut('settings', state.currentShift, 'currentShift');
+                            await dbPut('settings', state.generalNote, 'generalNote');
+                            
+                            // Arayüzdeki inputları yeni state'e göre dolduruyoruz
+                            document.getElementById('shiftDate').value = state.shiftDate || '';
+                            document.getElementById('shiftSelect').value = state.currentShift || '';
+                            document.getElementById('generalNote').value = state.generalNote || '';
+                            
+                            render();
+                            alert("Veriler başarıyla içe aktarıldı!");
+                        }
+                    } else {
+                        alert("Geçersiz veya bozuk JSON formatı.");
+                    }
+                } catch (err) {
+                    alert("Dosya okunurken bir hata oluştu: " + err.message);
+                }
+                event.target.value = ''; // Aynı dosyanın tekrar seçilebilmesi için inputu sıfırlıyoruz
+            };
+            reader.readAsText(file);
+        }
+    </script>
+    
+    <!-- Tam Ekran Resim (Lightbox) Modalı -->
+    <div id="imageLightbox" class="fixed inset-0 bg-black/90 hidden z-[60] flex items-center justify-center p-4 transition-opacity cursor-zoom-out" onclick="closeLightbox(event)">
+        <img id="lightboxImg" src="" class="max-w-full max-h-full object-contain rounded shadow-2xl cursor-default" onclick="event.stopPropagation()">
+        <button class="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl" onclick="closeLightbox(event)">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</body>
+</html>
