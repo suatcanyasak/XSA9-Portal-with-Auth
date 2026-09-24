@@ -1,11 +1,11 @@
-
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AFT-X | XSA9 Portal</title>
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -18,10 +18,37 @@
             background-color: #0f293e; 
             color: white;
             text-align: center;
-            padding: 8px 0;
+            padding: 10px 20px;
             font-weight: bold;
             font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
+        .topbar-title {
+            flex-grow: 1;
+            text-align: center;
+        }
+        .topbar-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            font-weight: normal;
+        }
+        .logout-btn {
+            background-color: #d9534f;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .logout-btn:hover {
+            background-color: #c9302c;
+        }
+
         .container {
             max-width: 900px;
             margin: 30px auto;
@@ -98,12 +125,12 @@
         /* --- Buton Grid Düzeni --- */
         .menu-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr); /* Görseldeki gibi 3 sütun */
+            grid-template-columns: repeat(3, 1fr);
             gap: 15px;
             padding: 0 20px;
         }
 
-        /* --- Buton Tasarımları (Boyutları Eşitlendi) --- */
+        /* --- Buton Tasarımları --- */
         .tool-btn {
             display: flex;
             align-items: center;
@@ -114,7 +141,7 @@
             border: 1px solid #333;
             padding: 10px 12px;
             font-size: 13px;
-            height: 55px; /* Tüm butonların yüksekliği kesin olarak sabitlendi */
+            height: 55px;
             box-sizing: border-box;
             transition: all 0.2s;
             text-align: center;
@@ -125,7 +152,72 @@
             border-color: #0071C5;
         }
 
-        /* Mobil Ekran Uyumluluğu */
+        /* --- Giriş Ekranı (Modal) Stilleri --- */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 41, 62, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .login-card {
+            background: white;
+            padding: 30px 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 320px;
+            text-align: center;
+        }
+        .login-card h3 {
+            margin-top: 0;
+            color: #0f293e;
+            margin-bottom: 20px;
+        }
+        .login-card input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        .login-card button {
+            width: 100%;
+            padding: 10px;
+            background-color: #0066c0;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .login-card button:hover {
+            background-color: #005299;
+        }
+        .login-card .btn-secondary {
+            background-color: #6c757d;
+        }
+        .login-card .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .auth-error {
+            color: #d9534f;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
         @media (max-width: 768px) {
             .menu-grid {
                 grid-template-columns: repeat(1, 1fr);
@@ -140,11 +232,30 @@
 </head>
 <body>
 
+    <!-- Üst Bar -->
     <div class="topbar">
-        XSA9 Web Tools Portal
+        <div style="width: 120px;"></div> <!-- Dengeleme için boş alan -->
+        <div class="topbar-title">XSA9 Web Tools Portal</div>
+        <div id="userInfo" class="topbar-user hidden">
+            <span id="userEmailText"></span>
+            <button class="logout-btn" onclick="logout()">Çıkış Yap</button>
+        </div>
     </div>
 
-    <div class="container">
+    <!-- Giriş Yapılmadığında Görünen Modal -->
+    <div id="loginModal" class="login-overlay">
+        <div class="login-card">
+            <h3>XSA9 Portal Girişi</h3>
+            <input type="email" id="authEmail" placeholder="E-posta adresiniz">
+            <input type="password" id="authPassword" placeholder="Şifreniz">
+            <button type="button" onclick="login()">Giriş Yap</button>
+            <button type="button" onclick="signUp()" class="btn-secondary">Kayıt Ol</button>
+            <div id="authError" class="auth-error"></div>
+        </div>
+    </div>
+
+    <!-- Ana Portalı İçeren Alan (Giriş Yapılınca Açılır) -->
+    <div class="container hidden" id="portalContent">
 
         <!-- Arama ve Son Kullanılan Tool Alanı -->
         <div class="search-section">
@@ -160,37 +271,95 @@
 
         <h2>Select <b>tool</b> at XSA9</h2>
 
-        <!-- Menü Butonları (data-code eklendi) -->
+        <!-- Menü Butonları -->
         <div class="menu-grid">
             <a href="./XSA9 Workforce Division CSV Format/index.html" class="tool-btn" data-code="1">Workforce Division CSV [1]</a>
-            
             <a href="./XSA9 Wrangle Occupation CSV Format/index.html" class="tool-btn" data-code="2">Wrangle Occupation CSV [2]</a>
-            
             <a href="./XSA9 CORA Capacity Management/index.html" class="tool-btn" data-code="3">CORA Capacity Management [3]</a>
-
             <a href="./XSA9-XTR1 Wrangle Occupation CSV Format Temporary/index.html" class="tool-btn" data-code="4">XSA9-XTR1 Wrangle Occupation CSV Format [4]</a>
-
             <a href="./XSA9 TRB Rapor/index.html" class="tool-btn" data-code="5">TRB Bridge Report [5]</a>
-
             <a href="./XSA9 TRB Follow Up/index.html" class="tool-btn" data-code="6">TRB Follow Up [6]</a>
-
             <a href="./XSA9 Lagrange Management/index.html" class="tool-btn" data-code="7">Lagrange Management [7]</a>
-
             <a href="./XSA9 Pack Performance Dashboard CSV Format/index.html" class="tool-btn" data-code="8">Pack Performance Tracking [8]</a>
-
-	    <a href="./XSA9 Pallet Calculator/index.html" class="tool-btn" data-code="9">Pallet Calculator [9]</a>
-
-	    <a href="./XSA9 Tote Locations/index.html" class="tool-btn" data-code="10">Tote Locations [10]</a>
-
+            <a href="./XSA9 Pallet Calculator/index.html" class="tool-btn" data-code="9">Pallet Calculator [9]</a>
+            <a href="./XSA9 Tote Locations/index.html" class="tool-btn" data-code="10">Tote Locations [10]</a>
             <a href="./XSA9 Backlog Follow Up/index.html" class="tool-btn" data-code="11">XSA9 Backlog Follow Up [11]</a>
-
             <a href="#" class="tool-btn" data-code="12">Yeni Eklenecek Araç [12]</a>
-
         </div>
     </div>
 
-    <!-- Arama Fonksiyonu JavaScript -->
+    <!-- JavaScript Entegrasyonu -->
     <script>
+        // Supabase Bilgilerinizi Buraya Yapıştırın
+        const SUPABASE_URL = 'https://nkjhrabhzwjynrhwefzt.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_ibwqeAgUBpfOVRwQ7rGAOA_mkqIWbw1';
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Sayfa yüklendiğinde oturum durumunu kontrol et
+        window.addEventListener('DOMContentLoaded', async () => {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            updateUI(session);
+
+            // Oturum değişikliklerini canlı dinle
+            supabaseClient.auth.onAuthStateChange((_event, session) => {
+                updateUI(session);
+            });
+        });
+
+        // Kullanıcı arayüzünü güncelleyen fonksiyon
+        function updateUI(session) {
+            const loginModal = document.getElementById('loginModal');
+            const portalContent = document.getElementById('portalContent');
+            const userInfo = document.getElementById('userInfo');
+            const userEmailText = document.getElementById('userEmailText');
+
+            if (session) {
+                loginModal.classList.add('hidden');
+                portalContent.classList.remove('hidden');
+                userInfo.classList.remove('hidden');
+                userEmailText.textContent = session.user.email;
+            } else {
+                loginModal.classList.remove('hidden');
+                portalContent.classList.add('hidden');
+                userInfo.classList.add('hidden');
+            }
+        }
+
+        // Giriş Yap Fonksiyonu
+        async function login() {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            const errorDiv = document.getElementById('authError');
+            errorDiv.textContent = '';
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                errorDiv.textContent = 'Giriş Başarısız: ' + error.message;
+            }
+        }
+
+        // Kayıt Ol Fonksiyonu
+        async function signUp() {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            const errorDiv = document.getElementById('authError');
+            errorDiv.textContent = '';
+
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) {
+                errorDiv.textContent = 'Kayıt Başarısız: ' + error.message;
+            } else {
+                alert('Kayıt başarılı! E-posta adresinize doğrulama bağlantısı gönderilmiş olabilir.');
+            }
+        }
+
+        // Çıkış Yap Fonksiyonu
+        async function logout() {
+            await supabaseClient.auth.signOut();
+        }
+
+        // Mevcut Arama Fonksiyonu
         function searchTool() {
             const input = document.getElementById('toolSearchInput').value.trim();
             if (!input) return;
@@ -200,7 +369,6 @@
 
             tools.forEach(tool => {
                 const code = tool.getAttribute('data-code');
-                // Numaraya göre (örn: 1), braketli numaraya göre (örn: [1]) veya tam isme göre eşleşme kontrolü
                 if (code === input || `[${code}]` === input || tool.textContent.toLowerCase().includes(input.toLowerCase())) {
                     targetUrl = tool.getAttribute('href');
                 }
@@ -215,7 +383,6 @@
             }
         }
 
-        // Enter tuşuna basıldığında aramayı tetikler
         function handleKeyPress(event) {
             if (event.key === 'Enter') {
                 searchTool();
