@@ -5,6 +5,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XSA9 - Tote Location Finder</title>
+    <!-- 1. Supabase JS SDK Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- 2. Supabase İstemci Tanımı ve Oturum Kontrolü -->
+    <script>
+        const SUPABASE_URL = 'https://nkjhrabhzwjynrhwefzt.supabase.co'; // Supabase Proje URL'iniz
+        const SUPABASE_ANON_KEY = 'sb_publishable_ibwqeAgUBpfOVRwQ7rGAOA_mkqIWbw1'; // Supabase Anon Key'iniz
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                if (error || !session) {
+                    window.location.href = 'https://suatcanyasak.github.io/XSA9-Portal-with-Auth/index.html'; 
+                }
+            } catch (err) {
+                // Herhangi bir bağlantı veya kod hatasında da doğrudan giriş sayfasına yönlendir
+                window.location.href = 'https://suatcanyasak.github.io/XSA9-Portal-with-Auth/index.html';
+            }
+        });
+    </script>
     <style>
         :root {
             --primary: #2563eb;
