@@ -290,31 +290,51 @@
 
     <!-- JavaScript Entegrasyonu -->
     <script>
-        // Supabase Bilgilerinizi Buraya Yapıştırın
+        // Supabase Bilgileriniz
         const SUPABASE_URL = 'https://nkjhrabhzwjynrhwefzt.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_ibwqeAgUBpfOVRwQ7rGAOA_mkqIWbw1';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Sayfa yüklendiğinde oturum durumunu kontrol et
+        // Sayfa yüklendiğinde oturum durumunu ve yönetici onayını kontrol et
         window.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await supabaseClient.auth.getSession();
-            updateUI(session);
+            await handleAuthState(session);
 
             // Oturum değişikliklerini canlı dinle
-            supabaseClient.auth.onAuthStateChange((_event, session) => {
-                updateUI(session);
+            supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+                await handleAuthState(session);
             });
         });
 
-        // Kullanıcı arayüzünü güncelleyen fonksiyon
-        function updateUI(session) {
+        // Kullanıcı giriş yapmışsa onay durumunu denetleyen ve arayüzü yöneten fonksiyon
+        async function handleAuthState(session) {
             const loginModal = document.getElementById('loginModal');
             const portalContent = document.getElementById('portalContent');
             const userInfo = document.getElementById('userInfo');
             const userEmailText = document.getElementById('userEmailText');
+            const errorDiv = document.getElementById('authError');
 
             if (session) {
+                // Supabase 'profiles' tablosundan onay durumunu oku
+                const { data: profile, error } = await supabaseClient
+                    .from('profiles')
+                    .select('is_approved')
+                    .eq('id', session.user.id)
+                    .single();
+
+                // Kullanıcı onaylanmamışsa veya profil bulunamazsa dışarı at
+                if (error || !profile || !profile.is_approved) {
+                    await supabaseClient.auth.signOut();
+                    errorDiv.textContent = 'Hesabınız henüz yönetici tarafından onaylanmamıştır.';
+                    
+                    loginModal.classList.remove('hidden');
+                    portalContent.classList.add('hidden');
+                    userInfo.classList.add('hidden');
+                    return;
+                }
+
+                // Yönetici onayı tamsa portal içeriğini göster
                 loginModal.classList.add('hidden');
                 portalContent.classList.remove('hidden');
                 userInfo.classList.remove('hidden');
@@ -350,7 +370,7 @@
             if (error) {
                 errorDiv.textContent = 'Kayıt Başarısız: ' + error.message;
             } else {
-                alert('Kayıt başarılı! E-posta adresinize doğrulama bağlantısı gönderilmiş olabilir.');
+                alert('Kayıt oluşturuldu! Hesabınız yöneticinin onayına sunulmuştur. Onaylandıktan sonra giriş yapabilirsiniz.');
             }
         }
 
@@ -359,7 +379,7 @@
             await supabaseClient.auth.signOut();
         }
 
-        // Mevcut Arama Fonksiyonu
+        // Arama Fonksiyonu
         function searchTool() {
             const input = document.getElementById('toolSearchInput').value.trim();
             if (!input) return;
