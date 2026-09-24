@@ -5,6 +5,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    // Alt sayfaların en tepesine eklenecek kontrol
+    window.addEventListener('DOMContentLoaded', async () => {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) {
+            // Giriş yapılmamışsa ana sayfaya yönlendir
+            window.location.href = '../index.html'; 
+        }
+    });
     <title>XSA9 Wrangle Occupation</title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
