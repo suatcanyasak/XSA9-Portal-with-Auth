@@ -9,6 +9,16 @@
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- Supabase Oturum Kontrolü -->
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
+                window.location.href = 'https://suatcanyasak.github.io/XSA9-Portal-with-Auth/XSA9%20Wrangle%20Occupation%20CSV%20Format/index.html'; 
+            }
+        });
+    </script>
+
     <style>
         /* --- TEMA DEĞİŞKENLERİ --- */
         :root {
@@ -381,16 +391,6 @@
     </div>
 
     <script>
-
-        // Alt sayfaların en tepesine eklenecek kontrol
-        window.addEventListener('DOMContentLoaded', async () => {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) {
-                // Giriş yapılmamışsa ana sayfaya yönlendir
-                window.location.href = '../index.html'; 
-            }
-        });
-        
         let con4Rows = [];
         let wipRows = [];
         let combinedDatabase = [];
