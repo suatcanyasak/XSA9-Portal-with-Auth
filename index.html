@@ -402,21 +402,31 @@
 
         // Kayıt Ol Fonksiyonu
         async function signUp() {
-            const email = document.getElementById('authEmail').value.trim();
+            const email = document.getElementById('authEmail').value.trim().toLowerCase();
             const password = document.getElementById('authPassword').value;
             const errorDiv = document.getElementById('authError');
             errorDiv.textContent = '';
-
+        
+            // İzin verilen e-posta uzantısı
+            const ALLOWED_DOMAIN = '@xyz.com.tr'; 
+        
             if (!email || !password) {
                 errorDiv.textContent = 'Lütfen e-posta ve şifre girin.';
                 return;
             }
-
+        
+            // 1. E-posta Uzantı Kontrolü
+            if (!email.endsWith(ALLOWED_DOMAIN)) {
+                errorDiv.textContent = `Yalnızca ${ALLOWED_DOMAIN} uzantılı kurumsal e-posta adresleri kayıt olabilir!`;
+                return;
+            }
+        
+            // 2. Supabase Kayıt İşlemi
             const { data, error } = await supabaseClient.auth.signUp({ email, password });
             if (error) {
                 errorDiv.textContent = 'Kayıt Başarısız: ' + error.message;
             } else {
-                alert('Kayıt oluşturuldu! Hesabınız yöneticinin onayına sunulmuştur. Onaylandıktan sonra giriş yapabilirsiniz.');
+                alert('Kayıt talebiniz alındı! Hesabınız yöneticinin onayına sunulmuştur.');
             }
         }
 
