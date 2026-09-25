@@ -302,7 +302,7 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 13 Saatlik Limit (13 * 60 * 60 * 1000 milisaniye)
-        const THIRTEEN_HOURS_MS = 13 * 60 * 60 * 1000;
+        const THIRTEEN_HOURS_MS = 0.025 * 60 * 60 * 1000;
         let timerInterval = null;
         let isCheckingAuth = false;
 
