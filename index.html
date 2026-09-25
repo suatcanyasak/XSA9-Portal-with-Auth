@@ -296,7 +296,10 @@
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Sayfa yüklendiğinde oturum durumunu ve yönetici onayını kontrol et
+        // 13 Saatlik Limit (Milisaniye cinsinden: 13 saat * 60 dk * 60 sn * 1000 ms)
+        const THIRTEEN_HOURS_MS = 13 * 60 * 60 * 1000;
+
+        // Sayfa yüklendiğinde oturum durumunu, süreyi ve yönetici onayını kontrol et
         window.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await supabaseClient.auth.getSession();
             await handleAuthState(session);
@@ -307,7 +310,7 @@
             });
         });
 
-        // Kullanıcı giriş yapmışsa onay durumunu denetleyen ve arayüzü yöneten fonksiyon
+        // Kullanıcı oturumunu, 13 saatlik süreyi ve onay durumunu denetleyen fonksiyon
         async function handleAuthState(session) {
             const loginModal = document.getElementById('loginModal');
             const portalContent = document.getElementById('portalContent');
@@ -316,7 +319,17 @@
             const errorDiv = document.getElementById('authError');
 
             if (session) {
-                // Supabase 'profiles' tablosundan onay durumunu oku
+                // 1. 13 SAATLİK SÜRE KONTROLÜ
+                const loginTimestamp = localStorage.getItem('login_timestamp');
+                const now = Date.now();
+
+                // Giriş damgası yoksa veya giriş yapılalı 13 saati geçmişse oturumu kapat
+                if (!loginTimestamp || (now - parseInt(loginTimestamp, 10)) > THIRTEEN_HOURS_MS) {
+                    await logout('13 saatlik oturum süreniz doldu. Lütfen tekrar giriş yapın.');
+                    return;
+                }
+
+                // 2. YÖNETİCİ ONAY KONTROLÜ (profiles tablosu)
                 const { data: profile, error } = await supabaseClient
                     .from('profiles')
                     .select('is_approved')
@@ -325,7 +338,7 @@
 
                 // Kullanıcı onaylanmamışsa veya profil bulunamazsa dışarı at
                 if (error || !profile || !profile.is_approved) {
-                    await supabaseClient.auth.signOut();
+                    await logout();
                     errorDiv.textContent = 'Hesabınız henüz yönetici tarafından onaylanmamıştır.';
                     
                     loginModal.classList.remove('hidden');
@@ -334,7 +347,7 @@
                     return;
                 }
 
-                // Yönetici onayı tamsa portal içeriğini göster
+                // Tüm kontroller başarılıysa portal içeriğini göster
                 loginModal.classList.add('hidden');
                 portalContent.classList.remove('hidden');
                 userInfo.classList.remove('hidden');
@@ -343,6 +356,7 @@
                 loginModal.classList.remove('hidden');
                 portalContent.classList.add('hidden');
                 userInfo.classList.add('hidden');
+                localStorage.removeItem('login_timestamp');
             }
         }
 
@@ -356,6 +370,9 @@
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
             if (error) {
                 errorDiv.textContent = 'Giriş Başarısız: ' + error.message;
+            } else {
+                // Başarılı giriş anının zaman damgasını milisaniye olarak sakla
+                localStorage.setItem('login_timestamp', Date.now().toString());
             }
         }
 
@@ -375,8 +392,12 @@
         }
 
         // Çıkış Yap Fonksiyonu
-        async function logout() {
+        async function logout(alertMessage = null) {
+            localStorage.removeItem('login_timestamp');
             await supabaseClient.auth.signOut();
+            if (alertMessage) {
+                alert(alertMessage);
+            }
         }
 
         // Arama Fonksiyonu
