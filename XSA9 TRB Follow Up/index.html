@@ -310,9 +310,18 @@
         }
 
         async function updateSettings(key, value) {
-            state[key] = value;
-            await dbPut('settings', value, key);
-            if(key === 'shift') render(); 
+            // Parameter eşleştirme hatasını önlemek için 'shift' gelse bile 'currentShift' yapıyoruz
+            const stateKey = key === 'shift' ? 'currentShift' : key;
+            
+            state[stateKey] = value;
+            await dbPut('settings', value, stateKey);
+        
+            if (stateKey === 'currentShift') {
+                // Vardiya değiştiğinde ilk saat dilimini otomatik aktif yap
+                const newIntervals = generateShiftIntervals();
+                activeRange = newIntervals[0]; 
+                render(); 
+            }
         }
 
         /* --- Dosya İsimlendirme Formatı: TRB Follow Up (23-9-2026) - 15-23 --- */
