@@ -308,7 +308,7 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 13 Saatlik Limit (Milisaniye cinsinden)
-        const THIRTEEN_HOURS_MS = 13 * 60 * 60 * 1000;
+        const THIRTEEN_HOURS_MS = 0.025 * 60 * 60 * 1000;
         let timerInterval = null;
 
         // Sayfa yüklendiğinde oturum durumunu, süreyi ve yönetici onayını kontrol et
