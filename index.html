@@ -42,7 +42,7 @@
             border-radius: 4px;
             font-family: monospace, sans-serif;
             font-size: 12px;
-            color: #ffeb3b; /* Göze çarpan sarı süre rengi */
+            color: #ffeb3b;
             font-weight: bold;
         }
         .logout-btn {
@@ -240,13 +240,11 @@
     </style>
 </head>
 <body>
-
     <!-- Üst Bar -->
     <div class="topbar">
-        <div style="width: 120px;"></div> <!-- Dengeleme için boş alan -->
+        <div style="width: 120px;"></div>
         <div class="topbar-title">XSA9 Web Tools Portal</div>
         <div id="userInfo" class="topbar-user hidden">
-            <!-- Kalan Süre Sayacı -->
             <span id="sessionTimer" class="timer-badge">Kalan Süre: --:--:--</span>
             <span id="userEmailText"></span>
             <button class="logout-btn" onclick="logout()">Çıkış Yap</button>
@@ -265,10 +263,8 @@
         </div>
     </div>
 
-    <!-- Ana Portalı İçeren Alan (Giriş Yapılınca Açılır) -->
+    <!-- Ana Portal İçeriği -->
     <div class="container hidden" id="portalContent">
-
-        <!-- Arama ve Son Kullanılan Tool Alanı -->
         <div class="search-section">
             <div class="last-used-container">
                 <span class="label">Last used tool</span>
@@ -282,7 +278,6 @@
 
         <h2>Select <b>tool</b> at XSA9</h2>
 
-        <!-- Menü Butonları -->
         <div class="menu-grid">
             <a href="./XSA9 Workforce Division CSV Format/index.html" class="tool-btn" data-code="1">Workforce Division CSV [1]</a>
             <a href="./XSA9 Wrangle Occupation CSV Format/index.html" class="tool-btn" data-code="2">Wrangle Occupation CSV [2]</a>
@@ -301,28 +296,28 @@
 
     <!-- JavaScript Entegrasyonu -->
     <script>
-        // Supabase Bilgileriniz
         const SUPABASE_URL = 'https://nkjhrabhzwjynrhwefzt.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_ibwqeAgUBpfOVRwQ7rGAOA_mkqIWbw1';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 13 Saatlik Limit (Milisaniye cinsinden)
+        // 13 Saatlik Limit (13 * 60 * 60 * 1000 milisaniye)
         const THIRTEEN_HOURS_MS = 13 * 60 * 60 * 1000;
         let timerInterval = null;
+        let isCheckingAuth = false;
 
-        // Sayfa yüklendiğinde oturum durumunu, süreyi ve yönetici onayını kontrol et
-        window.addEventListener('DOMContentLoaded', async () => {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            await handleAuthState(session);
-
-            // Oturum değişikliklerini canlı dinle
+        // Sayfa yüklendiğinde Auth durumunu dinle (Çift çalışma önlendi)
+        window.addEventListener('DOMContentLoaded', () => {
             supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-                await handleAuthState(session);
+                if (!isCheckingAuth) {
+                    isCheckingAuth = true;
+                    await handleAuthState(session);
+                    isCheckingAuth = false;
+                }
             });
         });
 
-        // Kullanıcı oturumunu, 13 saatlik süreyi ve onay durumunu denetleyen fonksiyon
+        // Oturum ve Süre Kontrolü
         async function handleAuthState(session) {
             const loginModal = document.getElementById('loginModal');
             const portalContent = document.getElementById('portalContent');
@@ -334,21 +329,26 @@
                 let loginTimestamp = localStorage.getItem('login_timestamp');
                 const now = Date.now();
 
+                // Eğer zaman damgası yoksa oluştur (Örn: sayfa yenilenmesinde)
+                if (!loginTimestamp) {
+                    loginTimestamp = now.toString();
+                    localStorage.setItem('login_timestamp', loginTimestamp);
+                }
+
                 // 1. 13 SAATLİK SÜRE KONTROLÜ
-                if (!loginTimestamp || (now - parseInt(loginTimestamp, 10)) > THIRTEEN_HOURS_MS) {
+                if ((now - parseInt(loginTimestamp, 10)) > THIRTEEN_HOURS_MS) {
                     stopCountdown();
                     await logout('13 saatlik oturum süreniz doldu. Lütfen tekrar giriş yapın.');
                     return;
                 }
 
-                // 2. YÖNETİCİ ONAY KONTROLÜ (profiles tablosu)
+                // 2. YÖNETİCİ ONAY KONTROLÜ
                 const { data: profile, error } = await supabaseClient
                     .from('profiles')
                     .select('is_approved')
                     .eq('id', session.user.id)
-                    .single();
+                    .maybeSingle();
 
-                // Kullanıcı onaylanmamışsa veya profil bulunamazsa dışarı at
                 if (error || !profile || !profile.is_approved) {
                     stopCountdown();
                     localStorage.removeItem('login_timestamp');
@@ -361,14 +361,13 @@
                     return;
                 }
 
-                // Tüm kontroller başarılıysa portal içeriğini göster ve sayacı başlat
+                // Onaylı oturum görünümü
                 loginModal.classList.add('hidden');
                 portalContent.classList.remove('hidden');
                 userInfo.classList.remove('hidden');
                 userEmailText.textContent = session.user.email;
 
                 startCountdown(parseInt(loginTimestamp, 10));
-
             } else {
                 stopCountdown();
                 loginModal.classList.remove('hidden');
@@ -380,28 +379,38 @@
 
         // Giriş Yap Fonksiyonu
         async function login() {
-            const email = document.getElementById('authEmail').value;
+            const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value;
             const errorDiv = document.getElementById('authError');
             errorDiv.textContent = '';
 
-            // Giriş işleminden önce zaman damgasını önceden ayarla (Supabase tetikleyicisi çakışmasını önler)
-            const loginTime = Date.now().toString();
-            localStorage.setItem('login_timestamp', loginTime);
+            if (!email || !password) {
+                errorDiv.textContent = 'Lütfen e-posta ve şifrenizi girin.';
+                return;
+            }
 
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            
             if (error) {
                 localStorage.removeItem('login_timestamp');
                 errorDiv.textContent = 'Giriş Başarısız: ' + error.message;
+            } else {
+                // Giriş Başarılı -> Zaman damgasını kaydet
+                localStorage.setItem('login_timestamp', Date.now().toString());
             }
         }
 
         // Kayıt Ol Fonksiyonu
         async function signUp() {
-            const email = document.getElementById('authEmail').value;
+            const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value;
             const errorDiv = document.getElementById('authError');
             errorDiv.textContent = '';
+
+            if (!email || !password) {
+                errorDiv.textContent = 'Lütfen e-posta ve şifre girin.';
+                return;
+            }
 
             const { data, error } = await supabaseClient.auth.signUp({ email, password });
             if (error) {
@@ -411,7 +420,7 @@
             }
         }
 
-        // Canlı Geri Sayım Sayacı
+        // Geri Sayım Sayacı
         function startCountdown(loginTimestamp) {
             stopCountdown();
 
@@ -492,6 +501,5 @@
             }
         }
     </script>
-
 </body>
 </html>
