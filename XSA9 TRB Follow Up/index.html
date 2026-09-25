@@ -186,7 +186,7 @@
         <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-3xl border border-gray-200 dark:border-gray-700 flex flex-col max-h-[85vh]">
             <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
                 <h3 class="text-xl font-bold text-gray-800 dark:text-white flex items-center">
-                    <i class="fas fa-archive mr-2 text-amber-500"></i> Bulut Arşivi (Supabase)
+                    <i class="fas fa-archive mr-2 text-amber-500"></i> Bulut Arşivi
                 </h3>
                 <button onclick="closeArchiveModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white"><i class="fas fa-times text-lg"></i></button>
             </div>
@@ -397,7 +397,7 @@
 
                 if (insertError) throw insertError;
 
-                alert(`Vardiya raporu "${state.shiftDate} / ${finalShiftName}" olarak başarıyla Supabase'e kaydedildi!`);
+                alert(`Vardiya raporu "${state.shiftDate} / ${finalShiftName}" olarak başarıyla kaydedildi!`);
             } catch (err) {
                 console.error("Supabase kayıt hatası:", err);
                 alert("Veri kaydedilirken bir hata oluştu: " + err.message);
