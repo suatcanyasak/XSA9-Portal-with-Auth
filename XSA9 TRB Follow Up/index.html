@@ -84,6 +84,16 @@
             </button>
             
             <div class="h-8 w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
+
+            <!-- Supabase Arşiv Butonu -->
+            <button onclick="openArchiveModal()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded shadow-md transition text-sm font-bold flex items-center">
+                <i class="fas fa-archive mr-2"></i> Arşiv
+            </button>
+
+            <!-- Supabase Kaydet Butonu -->
+            <button onclick="saveToSupabase()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded shadow-md transition text-sm font-bold flex items-center">
+                <i class="fas fa-cloud-upload-alt mr-2"></i> Kaydet
+            </button>
             
             <button onclick="clearAll()" class="bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 px-4 py-2 rounded transition text-sm font-medium border border-red-200 dark:border-red-800/50">
                 <i class="fas fa-trash-alt mr-1"></i> Temizle
@@ -170,6 +180,26 @@
             </div>
         </div>
     </main>
+
+    <!-- Supabase Arşiv Modalı -->
+    <div id="archiveModal" class="fixed inset-0 bg-gray-900/80 flex items-center justify-center hidden z-50 backdrop-blur-sm transition-opacity">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-3xl border border-gray-200 dark:border-gray-700 flex flex-col max-h-[85vh]">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white flex items-center">
+                    <i class="fas fa-archive mr-2 text-amber-500"></i> Bulut Arşivi (Supabase)
+                </h3>
+                <button onclick="closeArchiveModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto pr-1" id="archiveListContainer">
+                <!-- JS ile doldurulacak -->
+            </div>
+
+            <div class="flex justify-end gap-3 mt-4 shrink-0 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="closeArchiveModal()" class="px-5 py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white rounded-lg font-medium transition hover:bg-gray-300">Kapat</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal Canvas -->
     <div id="pasteModal" class="fixed inset-0 bg-gray-900/80 flex items-center justify-center hidden z-50 backdrop-blur-sm transition-opacity">
@@ -310,17 +340,175 @@
         }
 
         async function updateSettings(key, value) {
-            // Parameter eşleştirme hatasını önlemek için 'shift' gelse bile 'currentShift' yapıyoruz
             const stateKey = key === 'shift' ? 'currentShift' : key;
             
             state[stateKey] = value;
             await dbPut('settings', value, stateKey);
         
             if (stateKey === 'currentShift') {
-                // Vardiya değiştiğinde ilk saat dilimini otomatik aktif yap
                 const newIntervals = generateShiftIntervals();
                 activeRange = newIntervals[0]; 
                 render(); 
+            }
+        }
+
+        /* --- SUPABASE KAYIT & ARŞİV FONKSİYONLARI --- */
+        async function saveToSupabase() {
+            if (state.items.length === 0 && !state.generalNote) {
+                alert("Kaydedilecek veri bulunamadı.");
+                return;
+            }
+
+            try {
+                const baseShift = state.currentShift;
+                
+                // 1. Aynı tarih için daha önce yapılmış kayıtları kontrol et
+                const { data, error } = await supabaseClient
+                    .from('trb_reports')
+                    .select('shift_name')
+                    .eq('shift_date', state.shiftDate);
+
+                if (error) throw error;
+
+                // 2. Tekrarlı kayıt hesabı (Örn: "15:00-23:00", "15:00-23:00 (1)", "15:00-23:00 (2)")
+                let count = 0;
+                if (data && data.length > 0) {
+                    data.forEach(row => {
+                        if (row.shift_name === baseShift || row.shift_name.startsWith(baseShift + ' (')) {
+                            count++;
+                        }
+                    });
+                }
+
+                let finalShiftName = baseShift;
+                if (count > 0) {
+                    finalShiftName = `${baseShift} (${count})`;
+                }
+
+                // 3. Veritabanına Yeni Kayıt Ekle (Üzerine Yazma Yok)
+                const { error: insertError } = await supabaseClient
+                    .from('trb_reports')
+                    .insert([{
+                        shift_date: state.shiftDate,
+                        shift_name: finalShiftName,
+                        general_note: state.generalNote,
+                        items: state.items
+                    }]);
+
+                if (insertError) throw insertError;
+
+                alert(`Vardiya raporu "${state.shiftDate} / ${finalShiftName}" olarak başarıyla Supabase'e kaydedildi!`);
+            } catch (err) {
+                console.error("Supabase kayıt hatası:", err);
+                alert("Veri kaydedilirken bir hata oluştu: " + err.message);
+            }
+        }
+
+        async function openArchiveModal() {
+            document.getElementById('archiveModal').classList.remove('hidden');
+            const container = document.getElementById('archiveListContainer');
+            container.innerHTML = '<div class="text-center py-8 text-gray-500 dark:text-gray-400"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>Raporlar yükleniyor...</p></div>';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('trb_reports')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-500 dark:text-gray-400"><i class="fas fa-inbox text-3xl mb-2 opacity-50"></i><p>Henüz kaydedilmiş bir arşiv bulunmuyor.</p></div>';
+                    return;
+                }
+
+                let html = '<div class="flex flex-col gap-3">';
+                data.forEach(item => {
+                    const createdDate = new Date(item.created_at).toLocaleString('tr-TR');
+                    const itemCount = Array.isArray(item.items) ? item.items.length : 0;
+
+                    html += `
+                        <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 rounded-lg flex items-center justify-between hover:border-amber-500 transition">
+                            <div class="flex flex-col gap-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-800 dark:text-white text-base">${item.shift_date}</span>
+                                    <span class="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 px-2.5 py-0.5 rounded text-xs font-semibold">${item.shift_name}</span>
+                                </div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-3">
+                                    <span><i class="far fa-calendar-alt mr-1"></i> Kayıt: ${createdDate}</span>
+                                    <span><i class="fas fa-list-ul mr-1"></i> Kayıt Sayısı: ${itemCount}</span>
+                                </div>
+                                ${item.general_note ? `<p class="text-xs text-gray-600 dark:text-gray-300 italic mt-1 line-clamp-1">Not: ${item.general_note}</p>` : ''}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="loadReportFromSupabase(${item.id})" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded font-bold text-xs shadow transition flex items-center">
+                                    <i class="fas fa-folder-open mr-1.5"></i> Yükle
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+
+            } catch (err) {
+                console.error("Arşiv çekme hatası:", err);
+                container.innerHTML = `<div class="text-center py-8 text-red-500 text-sm">Raporlar yüklenirken hata oluştu: ${err.message}</div>`;
+            }
+        }
+
+        function closeArchiveModal() {
+            document.getElementById('archiveModal').classList.add('hidden');
+        }
+
+        async function loadReportFromSupabase(id) {
+            if (!confirm("Bu raporu yüklemek istediğinize emin misiniz? Mevcut çalışma alanınız güncellenecektir.")) {
+                return;
+            }
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('trb_reports')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+
+                if (error) throw error;
+
+                if (data) {
+                    let rawShift = data.shift_name || '15:00-23:00';
+                    let baseShift = rawShift.split(' ')[0]; // Örn: "15:00-23:00 (1)" -> "15:00-23:00"
+
+                    state.shiftDate = data.shift_date || '';
+                    state.currentShift = baseShift;
+                    state.generalNote = data.general_note || '';
+                    state.items = data.items || [];
+
+                    // IndexedDB'yi sıfırla ve veritabanından gelen verileri yerel depolamaya aktar
+                    await dbClear('items');
+                    for (let item of state.items) {
+                        await dbPut('items', item);
+                    }
+
+                    await dbPut('settings', state.shiftDate, 'shiftDate');
+                    await dbPut('settings', state.currentShift, 'currentShift');
+                    await dbPut('settings', state.generalNote, 'generalNote');
+
+                    // Arayüzü güncelle
+                    document.getElementById('shiftDate').value = state.shiftDate;
+                    document.getElementById('shiftSelect').value = state.currentShift;
+                    document.getElementById('generalNote').value = state.generalNote;
+
+                    const standardIntervals = generateShiftIntervals();
+                    activeRange = standardIntervals[0];
+
+                    render();
+                    closeArchiveModal();
+                    alert(`"${data.shift_date} - ${data.shift_name}" raporu başarıyla yüklendi.`);
+                }
+            } catch (err) {
+                console.error("Rapor yükleme hatası:", err);
+                alert("Rapor yüklenirken hata oluştu: " + err.message);
             }
         }
 
@@ -776,7 +964,6 @@
 
                     const imagesHtml = item.images.map((img, idx) => `
                         <div class="relative group w-full mb-2 border border-gray-300 dark:border-gray-600 rounded">
-                            <!-- Tıklama özelliği ve cursor eklendi -->
                             <img src="${img}" class="w-full h-auto object-contain rounded cursor-zoom-in" alt="Kayıt" onclick="openLightbox('${img}')">
                             <button onclick="removeExtraImage(${item.id}, ${idx})" class="absolute top-2 right-2 bg-red-600/80 hover:bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition z-10"><i class="fas fa-times"></i></button>
                         </div>
@@ -989,7 +1176,6 @@
                         const imgData = item.images[imgIndex];
                         const dimensions = await getImageDimensions(imgData);
                         
-                        // Görsel orijinal yüksek çözünürlüğünde eklenir
                         const targetWidthPx = Math.min(800, dimensions.width);
                         const aspect = dimensions.height / dimensions.width;
                         const targetHeightPx = targetWidthPx * aspect;
@@ -1110,11 +1296,8 @@
                 return;
             }
             
-            // Tüm state objesini (saat, notlar, resimler dahil) JSON formatına çeviriyoruz
             const dataStr = JSON.stringify(state, null, 2);
             const blob = new Blob([dataStr], { type: "application/json" });
-            
-            // Mevcut isimlendirme formatınızı kullanarak JSON indiriyoruz
             const fileName = getExportFileName('json'); 
             saveAs(blob, fileName);
         }
@@ -1129,13 +1312,10 @@
                 try {
                     const importedState = JSON.parse(e.target.result);
                     
-                    // Temel JSON doğrulama
                     if (importedState && Array.isArray(importedState.items)) {
                         if (confirm("Mevcut ekrandaki veriler silinecek ve yüklediğiniz dosyadaki veriler aktarılacak. Emin misiniz?")) {
-                            // Global state'i güncelliyoruz
                             state = importedState;
                             
-                            // IndexedDB'yi temizleyip yeni verileri yazıyoruz
                             await dbClear('items');
                             for (let item of state.items) {
                                 await dbPut('items', item);
@@ -1145,7 +1325,6 @@
                             await dbPut('settings', state.currentShift, 'currentShift');
                             await dbPut('settings', state.generalNote, 'generalNote');
                             
-                            // Arayüzdeki inputları yeni state'e göre dolduruyoruz
                             document.getElementById('shiftDate').value = state.shiftDate || '';
                             document.getElementById('shiftSelect').value = state.currentShift || '';
                             document.getElementById('generalNote').value = state.generalNote || '';
@@ -1159,7 +1338,7 @@
                 } catch (err) {
                     alert("Dosya okunurken bir hata oluştu: " + err.message);
                 }
-                event.target.value = ''; // Aynı dosyanın tekrar seçilebilmesi için inputu sıfırlıyoruz
+                event.target.value = '';
             };
             reader.readAsText(file);
         }
