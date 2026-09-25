@@ -417,7 +417,7 @@
         
             // 1. E-posta Uzantı Kontrolü
             if (!email.endsWith(ALLOWED_DOMAIN)) {
-                errorDiv.textContent = `Yalnızca ${ALLOWED_DOMAIN} uzantılı kurumsal e-posta adresleri kayıt olabilir!`;
+                errorDiv.textContent = `This domain name is not allowed.`;
                 return;
             }
         
