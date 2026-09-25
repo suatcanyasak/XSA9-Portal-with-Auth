@@ -36,6 +36,15 @@
             font-size: 13px;
             font-weight: normal;
         }
+        .timer-badge {
+            background-color: rgba(255, 255, 255, 0.15);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace, sans-serif;
+            font-size: 12px;
+            color: #ffeb3b; /* Göze çarpan sarı süre rengi */
+            font-weight: bold;
+        }
         .logout-btn {
             background-color: #d9534f;
             color: white;
@@ -237,6 +246,8 @@
         <div style="width: 120px;"></div> <!-- Dengeleme için boş alan -->
         <div class="topbar-title">XSA9 Web Tools Portal</div>
         <div id="userInfo" class="topbar-user hidden">
+            <!-- Kalan Süre Sayacı -->
+            <span id="sessionTimer" class="timer-badge">Kalan Süre: --:--:--</span>
             <span id="userEmailText"></span>
             <button class="logout-btn" onclick="logout()">Çıkış Yap</button>
         </div>
@@ -296,8 +307,9 @@
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 13 Saatlik Limit (Milisaniye cinsinden: 13 saat * 60 dk * 60 sn * 1000 ms)
+        // 13 Saatlik Limit (Milisaniye cinsinden)
         const THIRTEEN_HOURS_MS = 13 * 60 * 60 * 1000;
+        let timerInterval = null;
 
         // Sayfa yüklendiğinde oturum durumunu, süreyi ve yönetici onayını kontrol et
         window.addEventListener('DOMContentLoaded', async () => {
@@ -319,12 +331,12 @@
             const errorDiv = document.getElementById('authError');
 
             if (session) {
-                // 1. 13 SAATLİK SÜRE KONTROLÜ
-                const loginTimestamp = localStorage.getItem('login_timestamp');
+                let loginTimestamp = localStorage.getItem('login_timestamp');
                 const now = Date.now();
 
-                // Giriş damgası yoksa veya giriş yapılalı 13 saati geçmişse oturumu kapat
+                // 1. 13 SAATLİK SÜRE KONTROLÜ
                 if (!loginTimestamp || (now - parseInt(loginTimestamp, 10)) > THIRTEEN_HOURS_MS) {
+                    stopCountdown();
                     await logout('13 saatlik oturum süreniz doldu. Lütfen tekrar giriş yapın.');
                     return;
                 }
@@ -338,21 +350,27 @@
 
                 // Kullanıcı onaylanmamışsa veya profil bulunamazsa dışarı at
                 if (error || !profile || !profile.is_approved) {
-                    await logout();
-                    errorDiv.textContent = 'Hesabınız henüz yönetici tarafından onaylanmamıştır.';
+                    stopCountdown();
+                    localStorage.removeItem('login_timestamp');
+                    await supabaseClient.auth.signOut();
                     
+                    errorDiv.textContent = 'Hesabınız henüz yönetici tarafından onaylanmamıştır.';
                     loginModal.classList.remove('hidden');
                     portalContent.classList.add('hidden');
                     userInfo.classList.add('hidden');
                     return;
                 }
 
-                // Tüm kontroller başarılıysa portal içeriğini göster
+                // Tüm kontroller başarılıysa portal içeriğini göster ve sayacı başlat
                 loginModal.classList.add('hidden');
                 portalContent.classList.remove('hidden');
                 userInfo.classList.remove('hidden');
                 userEmailText.textContent = session.user.email;
+
+                startCountdown(parseInt(loginTimestamp, 10));
+
             } else {
+                stopCountdown();
                 loginModal.classList.remove('hidden');
                 portalContent.classList.add('hidden');
                 userInfo.classList.add('hidden');
@@ -367,12 +385,14 @@
             const errorDiv = document.getElementById('authError');
             errorDiv.textContent = '';
 
+            // Giriş işleminden önce zaman damgasını önceden ayarla (Supabase tetikleyicisi çakışmasını önler)
+            const loginTime = Date.now().toString();
+            localStorage.setItem('login_timestamp', loginTime);
+
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
             if (error) {
+                localStorage.removeItem('login_timestamp');
                 errorDiv.textContent = 'Giriş Başarısız: ' + error.message;
-            } else {
-                // Başarılı giriş anının zaman damgasını milisaniye olarak sakla
-                localStorage.setItem('login_timestamp', Date.now().toString());
             }
         }
 
@@ -391,8 +411,50 @@
             }
         }
 
+        // Canlı Geri Sayım Sayacı
+        function startCountdown(loginTimestamp) {
+            stopCountdown();
+
+            function updateTimer() {
+                const now = Date.now();
+                const remaining = THIRTEEN_HOURS_MS - (now - loginTimestamp);
+
+                if (remaining <= 0) {
+                    stopCountdown();
+                    logout('13 saatlik oturum süreniz doldu. Lütfen tekrar giriş yapın.');
+                    return;
+                }
+
+                const totalSeconds = Math.floor(remaining / 1000);
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+
+                const formattedTime = 
+                    String(hours).padStart(2, '0') + ':' +
+                    String(minutes).padStart(2, '0') + ':' +
+                    String(seconds).padStart(2, '0');
+
+                const timerElement = document.getElementById('sessionTimer');
+                if (timerElement) {
+                    timerElement.textContent = `Kalan Süre: ${formattedTime}`;
+                }
+            }
+
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function stopCountdown() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
         // Çıkış Yap Fonksiyonu
         async function logout(alertMessage = null) {
+            stopCountdown();
             localStorage.removeItem('login_timestamp');
             await supabaseClient.auth.signOut();
             if (alertMessage) {
